@@ -1,7 +1,7 @@
 #[cfg(feature = "graphql")]
-use std::iter::FromIterator;
-#[cfg(feature = "graphql")]
 use juniper::{GraphQLEnum, GraphQLObject, ParseScalarValue, Value};
+#[cfg(feature = "graphql")]
+use std::iter::FromIterator;
 
 use serde_derive::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -488,7 +488,6 @@ mod test {
         let p = Profile::default();
         println!("{}", json!(p))
     }
-
 
     #[test]
     fn test_fake_profile() {

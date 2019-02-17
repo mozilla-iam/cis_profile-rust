@@ -1,18 +1,16 @@
 extern crate base64;
 extern crate chrono;
 extern crate chrono_tz;
-#[macro_use]
 extern crate rand;
 extern crate serde;
 #[macro_use]
 extern crate serde_json;
-#[macro_use]
-extern crate serde_derive;
-extern crate uuid;
-extern crate openssl;
-extern crate untrusted;
-extern crate ring;
 extern crate biscuit;
+extern crate openssl;
+extern crate ring;
+extern crate serde_derive;
+extern crate untrusted;
+extern crate uuid;
 
 #[cfg(feature = "graphql")]
 #[macro_use]

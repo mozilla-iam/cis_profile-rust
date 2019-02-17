@@ -1,0 +1,26 @@
+{
+  "metadata": {
+    "classification": "WORKGROUP CONFIDENTIAL",
+    "created": "2019-02-15T16:19:07.000Z",
+    "display": "private",
+    "last_modified": "2019-02-15T21:59:07.000Z",
+    "verified": true
+  },
+  "signature": {
+    "additional": [
+      {
+        "alg": "RS256",
+        "name": null,
+        "typ": "JWS",
+        "value": ""
+      }
+    ],
+    "publisher": {
+      "alg": "RS256",
+      "name": "mozilliansorg",
+      "typ": "JWS",
+      "value": "eyJ0eXAiOiJKV1QiLCJhbGciOiJSUzI1NiJ9.eyJtZXRhZGF0YSI6eyJjbGFzc2lmaWNhdGlvbiI6IldPUktHUk9VUCBDT05GSURFTlRJQUwiLCJsYXN0X21vZGlmaWVkIjoiMjAxOS0wMi0xNVQxNjoxOTowNy4wMDBaIiwiY3JlYXRlZCI6IjIwMTktMDItMTVUMTY6MTk6MDcuMDAwWiIsInZlcmlmaWVkIjp0cnVlLCJkaXNwbGF5IjoicHJpdmF0ZSJ9LCJ2YWx1ZSI6IkRlYWwgc3RvcnkgaGVscCB3ZXN0IGNyaW1lLiBPdmVyIGxvdCB3cml0ZSBkZXZlbG9wIGFncmVlbWVudCBzb3V0aC4gUmV0dXJuIHRhc2sgZ2l2ZSBjYW5kaWRhdGUgd2UgZGVzY3JpYmUgYWdyZWUuXG5EZXNjcmliZSBuZWVkIHByb2R1Y3Qgc2lnbiBhbmQgdHJhdmVsLiBSb2NrIHNlYSBub3Qgd2VpZ2h0IHRha2UuIn0.UuRhMUKCLeZiG-KgT6C-w-OKkacvWVd6aA2h__7ZDwlGC0zLqNoYG9z_JPqK82Q8x4es9vumtShUMiH6OwLqAFJSoHmKaRq_v8OGBFAwuc5pVIVFsVHJ67MPKrcf5z-x5nUMu6PX7iQgPQBlfRX7dKARqUUC0t5G_6ItMCTYT3KSJLvXMYc5Mdfeoe29AH9pX6FVQVE0d-TCxCrrfspib1oMIUXj3U0Bir40w-eeAHA-AfS40b0ltzY-u6I5KMW6fstPPbkVuwYjL38RQnaRMxmAPbudCxpvYuBwxDsswPwLuuSxYMK61emkja01pMBFLz4OakPpjPj4nsnoCTSxQ8tCBYsolgQ6SKtYvKxQGa7HP6_Lq-Ndob3c4dBPdThrsaW1Jz-hm_ugYbnreKvrwoPPzdUDoC5Tssd_HCn9KRlOSPzr34DtAme5WWMh_S8Ai6VL7cTrbSLKuMhXA-PzJYluURX7i6xAmwXOFClwp4t1rciMxxobbhrEAOXC5cLycuYA226qWXg8TatrucdB2dWZ_e3_WfEwokZiV9qjXUdTsjaC-GtCjxceXRUJmmW1INeN6bV-08AUvxnORqG5fA4AOkIruTlC87htDHuqchQMVWRkIw8n0qyheSpqm5o9QG_gPRPeh55f-nBnDb7FVFZ8XN_t3m_V2Q8UI8k6l6o"
+    }
+  },
+  "value": "Signing works!"
+}

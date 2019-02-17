@@ -1,0 +1,24 @@
+[package]
+name = "cis-profile-rs"
+version = "0.1.0"
+authors = ["Florian Merz <flomerz@gmail.com>"]
+edition = "2018"
+
+[features]
+graphql = ["juniper"]
+
+[dependencies]
+biscuit = "0.1.0"
+ring = "0.13"
+openssl =" 0.10"
+untrusted = "0.6"
+serde = "1.0.80"
+serde_derive = "1.0.80"
+uuid = { version = "0.7", features = ["v5"] }
+serde_json = { version = "1.0.32", features = ["preserve_order"] }
+base64 = "0.10.0"
+chrono = "0.4"
+chrono-tz = "0.5"
+rand = "0.6"
+
+juniper = { version = "0.11.1", optional = true }

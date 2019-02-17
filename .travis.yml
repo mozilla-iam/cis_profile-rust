@@ -1,0 +1,13 @@
+language: rust
+rust:
+  - stable
+  - nightly
+before_script:
+  - rustup component add rustfmt-preview
+  - rustup component add clippy-preview
+script:
+  - cargo fmt --all -- --check
+  - cargo clippy --features graphql,aws
+  - cargo build --verbose --all
+  - cargo test --verbose --all
+  - cargo test --verbose --all --features graphql,aws

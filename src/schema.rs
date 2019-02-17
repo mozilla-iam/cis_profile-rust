@@ -486,14 +486,12 @@ mod test {
     #[test]
     fn basic_profile() {
         let p = Profile::default();
-        println!("{}", json!(p))
     }
 
     #[test]
     fn test_fake_profile() {
         let p = include_str!("../data/user_profile_null.json");
         let profile: Result<Profile, _> = serde_json::from_str(p);
-        println!("{:?}", profile);
         assert!(profile.is_ok());
     }
 }

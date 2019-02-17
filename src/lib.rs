@@ -15,6 +15,8 @@ extern crate uuid;
 #[cfg(feature = "graphql")]
 #[macro_use]
 extern crate juniper;
+#[cfg(feature = "aws")]
+extern crate rusoto_ssm;
 
 pub mod crypto;
 pub mod schema;

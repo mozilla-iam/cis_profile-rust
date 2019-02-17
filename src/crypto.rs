@@ -14,6 +14,11 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use untrusted;
 
+#[cfg(feature = "aws")]
+use rusoto_core::Region;
+#[cfg(feature = "aws")]
+use rusoto_ssm::{GetParameterRequest, Ssm, SsmClient};
+
 use crate::schema::*;
 
 pub struct Keys {
@@ -33,6 +38,54 @@ fn keys_from(jwk: JWK<Empty>) -> Result<Keys, String> {
 
 pub struct SecretStore {
     secrets: HashMap<String, Keys>,
+}
+
+impl Default for SecretStore {
+    fn default() -> Self {
+        SecretStore {
+            secrets: HashMap::default(),
+        }
+    }
+}
+
+impl SecretStore {
+    pub fn from_inline_iter<I>(keys: I) -> Result<Self, String>
+    where
+        I: IntoIterator<Item = (String, String)>,
+    {
+        let secrets: Result<HashMap<String, Keys>, String> = keys
+            .into_iter()
+            .map(|(k, v)| jwk_from_str(&v).and_then(keys_from).map(|key| (k, key)))
+            .collect();
+        Ok(SecretStore { secrets: secrets? })
+    }
+
+    #[cfg(feature = "aws")]
+    pub fn from_ssm_iter<I>(keys: I) -> Result<Self, String>
+    where
+        I: IntoIterator<Item = (String, String)>,
+    {
+        let ssm_client = SsmClient::new(Region::default());
+        let secrets: Result<HashMap<String, Keys>, String> = keys
+            .into_iter()
+            .map(|(publisher, ssm_parameter_name)| {
+                let req = GetParameterRequest {
+                    name: ssm_parameter_name,
+                    with_decryption: Some(true),
+                };
+                ssm_client
+                    .get_parameter(req)
+                    .sync()
+                    .map_err(|e| format!("error during get_paramter request: {}", e))
+                    .and_then(|p| p.parameter.ok_or_else(|| String::from("no paramter")))
+                    .and_then(|p| p.value.ok_or_else(|| String::from("no value")))
+                    .and_then(|v| jwk_from_str(&v))
+                    .and_then(keys_from)
+                    .map(|keys| (publisher, keys))
+            })
+            .collect();
+        Ok(SecretStore { secrets: secrets? })
+    }
 }
 
 #[allow(clippy::many_single_char_names)]
@@ -162,14 +215,9 @@ mod test {
     use super::*;
 
     fn get_fake_store() -> SecretStore {
-        let jwk = jwk_from_str(include_str!("../data/fake_key.json")).unwrap();
-        let mut store = SecretStore {
-            secrets: HashMap::new(),
-        };
-        store
-            .secrets
-            .insert(String::from("mozilliansorg"), keys_from(jwk).unwrap());
-        store
+        let key = include_str!("../data/fake_key.json");
+        SecretStore::from_inline_iter(vec![(String::from("mozilliansorg"), key.to_owned())])
+            .unwrap()
     }
 
     #[test]
@@ -223,6 +271,29 @@ mod test {
         let attr_signed = sign_attribute(&attr, &store)?;
         let valid = verify_attribute(&attr_signed, &store)?;
         assert!(valid);
+        Ok(())
+    }
+}
+
+#[cfg(feature = "aws")]
+#[cfg(test)]
+mod aws_test {
+    use super::*;
+    use std::env;
+
+    #[test]
+    fn test_keys_from_ssm() -> Result<(), String> {
+        if let Ok(mozillians_key_ssm_name) = env::var("CIS_SSM_MOZILLIANSORG_KEY") {
+            let store = SecretStore::from_ssm_iter(vec![(
+                String::from("mozilliansorg"),
+                mozillians_key_ssm_name,
+            )])?;
+            let attr: Value =
+                serde_json::from_str(include_str!("../data/attribute_invalid.json")).unwrap();
+            let attr_signed = sign_attribute(&attr, &store)?;
+            let valid = verify_attribute(&attr_signed, &store)?;
+            assert!(valid);
+        }
         Ok(())
     }
 }

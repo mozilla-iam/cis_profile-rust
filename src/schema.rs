@@ -252,9 +252,13 @@ pub enum Typ {
 #[cfg_attr(feature = "graphql", derive(GraphQLObject))]
 #[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
 pub struct AccessInformationValuesArray {
+    #[serde(default)]
     pub access_provider: AccessInformationProviderSubObject,
+    #[serde(default)]
     pub hris: AccessInformationProviderSubObject,
+    #[serde(default)]
     pub ldap: AccessInformationProviderSubObject,
+    #[serde(default)]
     pub mozilliansorg: AccessInformationProviderSubObject,
 }
 
@@ -356,14 +360,23 @@ impl Default for IdentitiesAttributesValuesArray {
 #[cfg_attr(feature = "graphql", derive(GraphQLObject))]
 #[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
 pub struct StaffInformationValuesArray {
+    #[serde(default)]
     pub manager: StandardAttributeBoolean,
+    #[serde(default)]
     pub director: StandardAttributeBoolean,
+    #[serde(default)]
     pub staff: StandardAttributeBoolean,
+    #[serde(default)]
     pub title: StandardAttributeString,
+    #[serde(default)]
     pub team: StandardAttributeString,
+    #[serde(default)]
     pub cost_center: StandardAttributeString,
+    #[serde(default)]
     pub worker_type: StandardAttributeString,
+    #[serde(default)]
     pub wpr_desk_number: StandardAttributeString,
+    #[serde(default)]
     pub office_location: StandardAttributeString,
 }
 
@@ -392,33 +405,61 @@ impl Default for StaffInformationValuesArray {
 #[cfg_attr(feature = "graphql", derive(GraphQLObject))]
 #[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
 pub struct Profile {
+    #[serde(default)]
     pub access_information: AccessInformationValuesArray,
+    #[serde(default)]
     pub active: StandardAttributeBoolean,
+    #[serde(default)]
     pub alternative_name: StandardAttributeString,
+    #[serde(default)]
     pub created: StandardAttributeString,
+    #[serde(default)]
     pub description: StandardAttributeString,
+    #[serde(default)]
     pub first_name: StandardAttributeString,
+    #[serde(default)]
     pub fun_title: StandardAttributeString,
+    #[serde(default)]
     pub identities: IdentitiesAttributesValuesArray,
+    #[serde(default)]
     pub languages: StandardAttributeValues,
+    #[serde(default)]
     pub last_modified: StandardAttributeString,
+    #[serde(default)]
     pub last_name: StandardAttributeString,
+    #[serde(default)]
     pub location: StandardAttributeString,
+    #[serde(default)]
     pub login_method: StandardAttributeString,
+    #[serde(default)]
     pub pgp_public_keys: StandardAttributeValues,
+    #[serde(default)]
     pub phone_numbers: StandardAttributeValues,
+    #[serde(default)]
     pub picture: StandardAttributeString,
+    #[serde(default)]
     pub primary_email: StandardAttributeString,
+    #[serde(default)]
     pub primary_username: StandardAttributeString,
+    #[serde(default)]
     pub pronouns: StandardAttributeString,
+    #[serde(default)]
     pub schema: String,
+    #[serde(default)]
     pub ssh_public_keys: StandardAttributeValues,
+    #[serde(default)]
     pub staff_information: StaffInformationValuesArray,
+    #[serde(default)]
     pub tags: StandardAttributeValues,
+    #[serde(default)]
     pub timezone: StandardAttributeString,
+    #[serde(default)]
     pub uris: StandardAttributeValues,
+    #[serde(default)]
     pub user_id: StandardAttributeString,
+    #[serde(default)]
     pub usernames: StandardAttributeValues,
+    #[serde(default)]
     pub uuid: StandardAttributeString,
 }
 
@@ -481,11 +522,10 @@ impl Default for Profile {
 #[cfg(test)]
 mod test {
     use super::*;
-    use serde_json::json;
 
     #[test]
     fn basic_profile() {
-        let p = Profile::default();
+        let _ = Profile::default();
     }
 
     #[test]
@@ -493,5 +533,16 @@ mod test {
         let p = include_str!("../data/user_profile_null.json");
         let profile: Result<Profile, _> = serde_json::from_str(p);
         assert!(profile.is_ok());
+    }
+
+    #[test]
+    fn test_partial_profile() {
+        let p = include_str!("../data/user_profile_partial.json");
+        let profile: Result<Profile, _> = serde_json::from_str(p);
+        assert!(profile.is_ok());
+        assert_eq!(
+            profile.unwrap().primary_username.value,
+            Some(String::from("fiji"))
+        );
     }
 }

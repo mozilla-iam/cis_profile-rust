@@ -5,7 +5,9 @@ use biscuit::jwk::RSAKeyParameters;
 use biscuit::jwk::JWK;
 use biscuit::jws;
 use biscuit::Empty;
+use num_bigint::BigUint;
 use openssl::bn::BigNum;
+use openssl::rsa::Rsa;
 use openssl::rsa::RsaPrivateKeyBuilder;
 use ring::signature::RSAKeyPair;
 use serde::Deserialize;
@@ -27,7 +29,34 @@ pub struct Keys {
     verify: jws::Secret,
 }
 
-fn keys_from(jwk: JWK<Empty>) -> Result<Keys, String> {
+fn keys_from_str(s: &str) -> Result<Keys, String> {
+    if s.starts_with("-----BEGIN RSA PRIVATE KEY-----") {
+        keys_from_pem(s)
+    } else {
+        keys_from_jwk(s)
+    }
+}
+
+fn keys_from_pem(key: &str) -> Result<Keys, String> {
+    let rsa = Rsa::private_key_from_pem(key.as_bytes())
+        .map_err(|e| format!("error reading key: {}", e))?;
+    let verify = jws::Secret::RSAModulusExponent {
+        n: BigUint::from_bytes_be(&rsa.n().to_vec()),
+        e: BigUint::from_bytes_be(&rsa.e().to_vec()),
+    };
+    let sign = jws::Secret::RSAKeyPair(Arc::new(
+        RSAKeyPair::from_der(untrusted::Input::from(
+            &rsa.private_key_to_der()
+                .map_err(|e| format!("error converting key: {}", e))?,
+        ))
+        .map_err(|e| format!("error converting to der: {}", e))?,
+    ));
+    Ok(Keys { sign, verify })
+}
+
+fn keys_from_jwk(key: &str) -> Result<Keys, String> {
+    let mut j = serde_json::Deserializer::from_str(key);
+    let jwk = JWK::deserialize(&mut j).map_err(|e| format!("error reading jwk: {}", e))?;
     let rsa = to_rsa_key_params(jwk)?;
     let verify = rsa.jws_public_key_secret();
     let sign = jws::Secret::RSAKeyPair(Arc::new(
@@ -56,7 +85,7 @@ impl SecretStore {
     {
         let secrets: Result<HashMap<String, Keys>, String> = keys
             .into_iter()
-            .map(|(k, v)| jwk_from_str(&v).and_then(keys_from).map(|key| (k, key)))
+            .map(|(k, v)| keys_from_str(&v).map(|key| (k, key)))
             .collect();
         Ok(SecretStore { secrets: secrets? })
     }
@@ -80,8 +109,7 @@ impl SecretStore {
                     .map_err(|e| format!("error during get_paramter request: {}", e))
                     .and_then(|p| p.parameter.ok_or_else(|| String::from("no paramter")))
                     .and_then(|p| p.value.ok_or_else(|| String::from("no value")))
-                    .and_then(|v| jwk_from_str(&v))
-                    .and_then(keys_from)
+                    .and_then(|v| keys_from_str(&v))
                     .map(|keys| (publisher, keys))
             })
             .collect();
@@ -129,11 +157,6 @@ fn to_rsa_key_params(jwk: JWK<Empty>) -> Result<RSAKeyParameters, String> {
     } else {
         Err(String::from("no rsa jwk"))
     }
-}
-
-fn jwk_from_str(key: &str) -> Result<JWK<Empty>, String> {
-    let mut j = serde_json::Deserializer::from_str(key);
-    JWK::deserialize(&mut j).map_err(|e| format!("error reading jwk: {}", e))
 }
 
 pub fn verify_attribute(attr: &impl Serialize, store: &SecretStore) -> Result<bool, String> {

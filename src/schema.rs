@@ -317,8 +317,6 @@ pub struct IdentitiesAttributesValuesArray {
     #[serde(default)]
     pub github_primary_email: StandardAttributeString,
     #[serde(default)]
-    pub dinopark_id: StandardAttributeString,
-    #[serde(default)]
     pub mozilliansorg_id: StandardAttributeString,
     #[serde(default)]
     pub bugzilla_mozilla_org_id: StandardAttributeString,
@@ -346,10 +344,6 @@ impl Default for IdentitiesAttributesValuesArray {
             github_id_v3: StandardAttributeString::default(),
             github_id_v4: StandardAttributeString::default(),
             github_primary_email: StandardAttributeString::with(
-                Some(Display::Public),
-                Classification::default(),
-            ),
-            dinopark_id: StandardAttributeString::with(
                 Some(Display::Public),
                 Classification::default(),
             ),

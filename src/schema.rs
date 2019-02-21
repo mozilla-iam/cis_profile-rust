@@ -6,6 +6,10 @@ use std::iter::FromIterator;
 use serde_derive::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
+pub trait Sign {
+    fn sign(&mut self, publisher: Publisher);
+}
+
 #[derive(Default, Clone, PartialEq, Debug, Deserialize, Serialize)]
 pub struct KeyValue(pub BTreeMap<String, serde_json::Value>);
 
@@ -49,6 +53,12 @@ impl AccessInformationProviderSubObject {
             signature: Signature::default(),
             values: None,
         }
+    }
+}
+
+impl Sign for AccessInformationProviderSubObject {
+    fn sign(&mut self, publisher: Publisher) {
+        self.signature.publisher = publisher;
     }
 }
 
@@ -203,6 +213,12 @@ impl StandardAttributeBoolean {
     }
 }
 
+impl Sign for StandardAttributeBoolean {
+    fn sign(&mut self, publisher: Publisher) {
+        self.signature.publisher = publisher;
+    }
+}
+
 #[cfg_attr(feature = "graphql", derive(GraphQLObject))]
 #[derive(Clone, PartialEq, Debug, Default, Deserialize, Serialize)]
 pub struct StandardAttributeString {
@@ -222,6 +238,12 @@ impl StandardAttributeString {
     }
 }
 
+impl Sign for StandardAttributeString {
+    fn sign(&mut self, publisher: Publisher) {
+        self.signature.publisher = publisher;
+    }
+}
+
 #[cfg_attr(feature = "graphql", derive(GraphQLObject))]
 #[derive(Clone, PartialEq, Debug, Default, Deserialize, Serialize)]
 pub struct StandardAttributeValues {
@@ -237,6 +259,12 @@ impl StandardAttributeValues {
             signature: Signature::default(),
             values: None,
         }
+    }
+}
+
+impl Sign for StandardAttributeValues {
+    fn sign(&mut self, publisher: Publisher) {
+        self.signature.publisher = publisher;
     }
 }
 

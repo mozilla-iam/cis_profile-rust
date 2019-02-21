@@ -9,6 +9,7 @@ use openssl::bn::BigNum;
 use openssl::rsa::RsaPrivateKeyBuilder;
 use ring::signature::RSAKeyPair;
 use serde::Deserialize;
+use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -135,9 +136,10 @@ fn jwk_from_str(key: &str) -> Result<JWK<Empty>, String> {
     JWK::deserialize(&mut j).map_err(|e| format!("error reading jwk: {}", e))
 }
 
-pub fn verify_attribute(attr: &Value, store: &SecretStore) -> Result<bool, String> {
-    let mut attr_c = attr.clone();
-    let publisher = attr["signature"]["publisher"]["name"]
+pub fn verify_attribute(attr: &impl Serialize, store: &SecretStore) -> Result<bool, String> {
+    let mut attr_c: Value =
+        serde_json::to_value(attr).map_err(|e| format!("unable to serialize json: {}", e))?;
+    let publisher = attr_c["signature"]["publisher"]["name"]
         .as_str()
         .ok_or_else(|| String::from("publisher missing"))?;
     let keys = store
@@ -164,18 +166,25 @@ pub fn verify_attribute(attr: &Value, store: &SecretStore) -> Result<bool, Strin
     }
 }
 
-pub fn sign_attribute(attr: &Value, store: &SecretStore) -> Result<Value, String> {
-    let mut attr_c = if let Value::Object(m) = attr.clone() {
+pub fn sign_attribute<T>(attr: &mut T, store: &SecretStore) -> Result<(), String>
+where
+    T: Serialize + Sign + Clone,
+{
+    let mut attr_c = if let Value::Object(m) = serde_json::to_value(attr.clone())
+        .map_err(|e| format!("unable to serialize json: {}", e))?
+    {
         m
     } else {
         return Err(String::from("attribute must be an object"));
     };
-    let publisher = attr["signature"]["publisher"]["name"]
+    let publisher = attr_c["signature"]["publisher"]["name"]
+        .clone()
         .as_str()
+        .map(|s| s.to_owned())
         .ok_or_else(|| String::from("publisher missing"))?;
     let keys = store
         .secrets
-        .get(publisher)
+        .get(&publisher)
         .ok_or_else(|| format!("no keys for {}", publisher))?;
     let _ = attr_c.remove("signature").unwrap_or_default();
 
@@ -199,20 +208,20 @@ pub fn sign_attribute(attr: &Value, store: &SecretStore) -> Result<Value, String
         .encoded()
         .map_err(|e| format!("unable to get encoded jwt: {}", e))?
         .to_string();
-    let mut attr_signed = attr.clone();
-    attr_signed["signature"]["publisher"] = json!(Publisher {
+    attr.sign(Publisher {
         alg: Alg::Rs256,
         name: serde_json::from_str(&format!(r#""{}""#, publisher))
             .map_err(|e| format!("unknown publisher ({}): {}", publisher, e))?,
         value: token,
         typ: Typ::Jws,
     });
-    Ok(attr_signed)
+    Ok(())
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::schema::StandardAttributeString;
 
     fn get_fake_store() -> SecretStore {
         let key = include_str!("../data/fake_key.json");
@@ -256,9 +265,9 @@ mod test {
     fn test_sign_attribute() -> Result<(), String> {
         let store = get_fake_store();
 
-        let attr: Value =
+        let mut attr: StandardAttributeString =
             serde_json::from_str(include_str!("../data/attribute_invalid.json")).unwrap();
-        let _ = sign_attribute(&attr, &store)?;
+        let _ = sign_attribute(&mut attr, &store)?;
         Ok(())
     }
 
@@ -266,10 +275,38 @@ mod test {
     fn test_sign_and_verify_attribute() -> Result<(), String> {
         let store = get_fake_store();
 
-        let attr: Value =
+        let mut attr: StandardAttributeString =
             serde_json::from_str(include_str!("../data/attribute_invalid.json")).unwrap();
-        let attr_signed = sign_attribute(&attr, &store)?;
-        let valid = verify_attribute(&attr_signed, &store)?;
+        sign_attribute(&mut attr, &store)?;
+        let valid = verify_attribute(&attr, &store)?;
+        assert!(valid);
+        Ok(())
+    }
+
+    #[test]
+    fn test_sign_and_verify_struct() -> Result<(), String> {
+        let store = get_fake_store();
+
+        let mut attr = StandardAttributeString::default();
+        attr.value = Some(String::from("foobar"));
+        sign_attribute(&mut attr, &store)?;
+        let valid = verify_attribute(&attr, &store)?;
+        assert!(valid);
+        Ok(())
+    }
+
+    #[test]
+    fn test_sign_and_verify_profile_field() -> Result<(), String> {
+        let store = get_fake_store();
+
+        let mut profile = Profile::default();
+        profile.primary_username.value = Some(String::from("foobar"));
+        profile.staff_information.staff.value = Some(true);
+        sign_attribute(&mut profile.primary_username, &store)?;
+        sign_attribute(&mut profile.staff_information.staff, &store)?;
+        let valid = verify_attribute(&profile.primary_username, &store)?;
+        assert!(valid);
+        let valid = verify_attribute(&profile.staff_information.staff, &store)?;
         assert!(valid);
         Ok(())
     }
@@ -288,10 +325,10 @@ mod aws_test {
                 String::from("mozilliansorg"),
                 mozillians_key_ssm_name,
             )])?;
-            let attr: Value =
+            let mut attr: StandardAttributeString =
                 serde_json::from_str(include_str!("../data/attribute_invalid.json")).unwrap();
-            let attr_signed = sign_attribute(&attr, &store)?;
-            let valid = verify_attribute(&attr_signed, &store)?;
+            sign_attribute(&mut attr, &store)?;
+            let valid = verify_attribute(&attr, &store)?;
             assert!(valid);
         }
         Ok(())

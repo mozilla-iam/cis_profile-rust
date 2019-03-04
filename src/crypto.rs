@@ -162,6 +162,11 @@ fn to_rsa_key_params(jwk: JWK<Empty>) -> Result<RSAKeyParameters, String> {
 pub fn verify_attribute(attr: &impl Serialize, store: &SecretStore) -> Result<bool, String> {
     let mut attr_c: Value =
         serde_json::to_value(attr).map_err(|e| format!("unable to serialize json: {}", e))?;
+    if attr_c.get("value").or_else(|| attr_c.get("values")) == Some(&Value::Null)
+        && attr_c["signature"]["publisher"]["value"] == ""
+    {
+        return Ok(true);
+    }
     let publisher = attr_c["signature"]["publisher"]["name"]
         .as_str()
         .ok_or_else(|| String::from("publisher missing"))?;
@@ -200,6 +205,9 @@ where
     } else {
         return Err(String::from("attribute must be an object"));
     };
+    if let Some(Value::Null) = attr_c.get("value").or_else(|| attr_c.get("values")) {
+        return Ok(());
+    }
     let publisher = attr_c["signature"]["publisher"]["name"]
         .clone()
         .as_str()
@@ -313,6 +321,32 @@ mod test {
         let mut attr = StandardAttributeString::default();
         attr.value = Some(String::from("foobar"));
         sign_attribute(&mut attr, &store)?;
+        let valid = verify_attribute(&attr, &store)?;
+        assert!(valid);
+        Ok(())
+    }
+
+    #[test]
+    fn test_sign_and_verify_struct_null_value() -> Result<(), String> {
+        let store = get_fake_store();
+
+        let mut attr = StandardAttributeString::default();
+        attr.value = None;
+        sign_attribute(&mut attr, &store)?;
+        assert!(attr.signature.publisher.value.is_empty());
+        let valid = verify_attribute(&attr, &store)?;
+        assert!(valid);
+        Ok(())
+    }
+
+    #[test]
+    fn test_sign_and_verify_struct_null_values() -> Result<(), String> {
+        let store = get_fake_store();
+
+        let mut attr = StandardAttributeValues::default();
+        attr.values = None;
+        sign_attribute(&mut attr, &store)?;
+        assert!(attr.signature.publisher.value.is_empty());
         let valid = verify_attribute(&attr, &store)?;
         assert!(valid);
         Ok(())

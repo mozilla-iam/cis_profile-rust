@@ -13,6 +13,8 @@ extern crate untrusted;
 #[macro_use]
 extern crate juniper;
 #[cfg(feature = "aws")]
+extern crate reqwest;
+#[cfg(feature = "aws")]
 extern crate rusoto_ssm;
 
 pub mod crypto;

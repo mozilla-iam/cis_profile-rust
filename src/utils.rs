@@ -90,14 +90,15 @@ mod test {
 
     fn get_fake_store() -> SecretStore {
         let key = include_str!("../data/fake_key.json");
-        SecretStore::from_inline_iter(vec![
-            (String::from("mozilliansorg"), key.to_owned()),
-            (String::from("hris"), key.to_owned()),
-            (String::from("ldap"), key.to_owned()),
-            (String::from("cis"), key.to_owned()),
-            (String::from("access_provider"), key.to_owned()),
-        ])
-        .unwrap()
+        SecretStore::default()
+            .with_sign_keys_from_inline_iter(vec![
+                (String::from("mozilliansorg"), key.to_owned()),
+                (String::from("hris"), key.to_owned()),
+                (String::from("ldap"), key.to_owned()),
+                (String::from("cis"), key.to_owned()),
+                (String::from("access_provider"), key.to_owned()),
+            ])
+            .unwrap()
     }
 
     #[test]
@@ -132,17 +133,18 @@ mod test_make {
             env::var("CIS_SSM_ACCESS_PROVIDER_KEY"),
         ) {
             Some(
-                SecretStore::from_ssm_iter(vec![
-                    (String::from("mozilliansorg"), mozillians_key_ssm_name),
-                    (String::from("hris"), hris_key_ssm_name),
-                    (String::from("ldap"), ldap_key_ssm_name),
-                    (String::from("cis"), cis_key_ssm_name),
-                    (
-                        String::from("access_provider"),
-                        access_provider_key_ssm_name,
-                    ),
-                ])
-                .unwrap(),
+                SecretStore::default()
+                    .with_sign_keys_from_ssm_iter(vec![
+                        (String::from("mozilliansorg"), mozillians_key_ssm_name),
+                        (String::from("hris"), hris_key_ssm_name),
+                        (String::from("ldap"), ldap_key_ssm_name),
+                        (String::from("cis"), cis_key_ssm_name),
+                        (
+                            String::from("access_provider"),
+                            access_provider_key_ssm_name,
+                        ),
+                    ])
+                    .unwrap(),
             )
         } else {
             None

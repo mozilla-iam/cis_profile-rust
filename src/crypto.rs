@@ -4,6 +4,7 @@ use biscuit::jwk::AlgorithmParameters;
 use biscuit::jwk::RSAKeyParameters;
 use biscuit::jwk::JWK;
 use biscuit::jws;
+use biscuit::jws::Secret;
 use biscuit::Empty;
 use num_bigint::BigUint;
 use openssl::bn::BigNum;
@@ -24,26 +25,27 @@ use rusoto_ssm::{GetParameterRequest, Ssm, SsmClient};
 
 use crate::schema::*;
 
-pub struct Keys {
-    sign: jws::Secret,
-    verify: jws::Secret,
-}
-
-fn keys_from_str(s: &str) -> Result<Keys, String> {
+fn verify_key_from_str(s: &str) -> Result<Secret, String> {
     if s.starts_with("-----BEGIN RSA PRIVATE KEY-----") {
-        keys_from_pem(s)
+        verify_key_from_private_pem(s)
+    } else if s.starts_with("-----BEGIN PUBLIC KEY-----") {
+        verify_key_from_public_pem(s)
     } else {
-        keys_from_jwk(s)
+        verify_key_from_jwk(s)
     }
 }
 
-fn keys_from_pem(key: &str) -> Result<Keys, String> {
+fn sign_key_from_str(s: &str) -> Result<Secret, String> {
+    if s.starts_with("-----BEGIN RSA PRIVATE KEY-----") {
+        sign_key_from_pem(s)
+    } else {
+        sign_key_from_jwk(s)
+    }
+}
+
+fn sign_key_from_pem(key: &str) -> Result<Secret, String> {
     let rsa = Rsa::private_key_from_pem(key.as_bytes())
         .map_err(|e| format!("error reading key: {}", e))?;
-    let verify = jws::Secret::RSAModulusExponent {
-        n: BigUint::from_bytes_be(&rsa.n().to_vec()),
-        e: BigUint::from_bytes_be(&rsa.e().to_vec()),
-    };
     let sign = jws::Secret::RSAKeyPair(Arc::new(
         RSAKeyPair::from_der(untrusted::Input::from(
             &rsa.private_key_to_der()
@@ -51,54 +53,124 @@ fn keys_from_pem(key: &str) -> Result<Keys, String> {
         ))
         .map_err(|e| format!("error converting to der: {}", e))?,
     ));
-    Ok(Keys { sign, verify })
+    Ok(sign)
 }
 
-fn keys_from_jwk(key: &str) -> Result<Keys, String> {
-    let mut j = serde_json::Deserializer::from_str(key);
-    let jwk = JWK::deserialize(&mut j).map_err(|e| format!("error reading jwk: {}", e))?;
-    let rsa = to_rsa_key_params(jwk)?;
-    let verify = rsa.jws_public_key_secret();
+fn verify_key_from_public_pem(key: &str) -> Result<Secret, String> {
+    let rsa = Rsa::public_key_from_pem(key.as_bytes())
+        .map_err(|e| format!("error reading key: {}", e))?;
+    let verify = jws::Secret::RSAModulusExponent {
+        n: BigUint::from_bytes_be(&rsa.n().to_vec()),
+        e: BigUint::from_bytes_be(&rsa.e().to_vec()),
+    };
+    Ok(verify)
+}
+fn verify_key_from_private_pem(key: &str) -> Result<Secret, String> {
+    let rsa = Rsa::private_key_from_pem(key.as_bytes())
+        .map_err(|e| format!("error reading key: {}", e))?;
+    let verify = jws::Secret::RSAModulusExponent {
+        n: BigUint::from_bytes_be(&rsa.n().to_vec()),
+        e: BigUint::from_bytes_be(&rsa.e().to_vec()),
+    };
+    Ok(verify)
+}
+
+fn sign_key_from_jwk(key: &str) -> Result<Secret, String> {
+    let rsa = jwk_str_to_rsa_key_params(key)?;
     let sign = jws::Secret::RSAKeyPair(Arc::new(
         RSAKeyPair::from_der(untrusted::Input::from(&to_der(rsa)?))
             .map_err(|e| format!("error converting to der: {}", e))?,
     ));
-    Ok(Keys { sign, verify })
+    Ok(sign)
+}
+
+fn verify_key_from_jwk(key: &str) -> Result<Secret, String> {
+    let rsa = jwk_str_to_rsa_key_params(key)?;
+    let verify = rsa.jws_public_key_secret();
+    Ok(verify)
 }
 
 pub struct SecretStore {
-    secrets: HashMap<String, Keys>,
+    sign_secrets: HashMap<String, Secret>,
+    verify_secrets: HashMap<String, Secret>,
 }
 
 impl Default for SecretStore {
     fn default() -> Self {
         SecretStore {
-            secrets: HashMap::default(),
+            sign_secrets: HashMap::default(),
+            verify_secrets: HashMap::default(),
         }
     }
 }
 
 impl SecretStore {
-    pub fn from_inline_iter<I>(keys: I) -> Result<Self, String>
+    pub fn with_sign_keys_from_inline_iter<I>(mut self, sign_keys: I) -> Result<Self, String>
     where
         I: IntoIterator<Item = (String, String)>,
     {
-        let secrets: Result<HashMap<String, Keys>, String> = keys
+        let sign_secrets: Result<HashMap<String, Secret>, String> = sign_keys
             .into_iter()
-            .map(|(k, v)| keys_from_str(&v).map(|key| (k, key)))
+            .map(|(k, v)| sign_key_from_str(&v).map(|key| (k, key)))
             .collect();
-        Ok(SecretStore { secrets: secrets? })
+        self.sign_secrets.extend(sign_secrets?);
+        Ok(self)
+    }
+
+    pub fn with_verify_keys_from_inline_iter<I>(mut self, sign_keys: I) -> Result<Self, String>
+    where
+        I: IntoIterator<Item = (String, String)>,
+    {
+        let verify_secrets: Result<HashMap<String, Secret>, String> = sign_keys
+            .into_iter()
+            .map(|(k, v)| verify_key_from_str(&v).map(|key| (k, key)))
+            .collect();
+        self.verify_secrets.extend(verify_secrets?);
+        Ok(self)
     }
 
     #[cfg(feature = "aws")]
-    pub fn from_ssm_iter<I>(keys: I) -> Result<Self, String>
+    pub fn with_sign_keys_from_ssm_iter<I>(mut self, keys: I) -> Result<Self, String>
+    where
+        I: IntoIterator<Item = (String, String)>,
+    {
+        let sign_secrets: Result<HashMap<String, Secret>, String> =
+            SecretStore::str_keys_from_ssm_iter(keys)
+                .into_iter()
+                .map(|x| {
+                    x.and_then(|(publisher, v)| sign_key_from_str(&v).map(|key| (publisher, key)))
+                })
+                .collect();
+        self.sign_secrets.extend(sign_secrets?);
+        Ok(self)
+    }
+
+    #[cfg(feature = "aws")]
+    pub fn with_verify_keys_from_ssm_iter<I>(mut self, keys: I) -> Result<Self, String>
+    where
+        I: IntoIterator<Item = (String, String)>,
+    {
+        let verify_secrets: Result<HashMap<String, Secret>, String> =
+            SecretStore::str_keys_from_ssm_iter(keys)
+                .into_iter()
+                .map(|x| {
+                    x.and_then(|(publisher, v)| verify_key_from_str(&v).map(|key| (publisher, key)))
+                })
+                .collect();
+        self.verify_secrets.extend(verify_secrets?);
+        Ok(self)
+    }
+
+    #[cfg(feature = "aws")]
+    fn str_keys_from_ssm_iter<I>(
+        keys: I,
+    ) -> impl IntoIterator<Item = Result<(String, String), String>>
     where
         I: IntoIterator<Item = (String, String)>,
     {
         let ssm_client = SsmClient::new(Region::default());
-        let secrets: Result<HashMap<String, Keys>, String> = keys
-            .into_iter()
-            .map(|(publisher, ssm_parameter_name)| {
+        keys.into_iter()
+            .map(move |(publisher, ssm_parameter_name)| {
                 let req = GetParameterRequest {
                     name: ssm_parameter_name,
                     with_decryption: Some(true),
@@ -109,11 +181,33 @@ impl SecretStore {
                     .map_err(|e| format!("error during get_paramter request: {}", e))
                     .and_then(|p| p.parameter.ok_or_else(|| String::from("no paramter")))
                     .and_then(|p| p.value.ok_or_else(|| String::from("no value")))
-                    .and_then(|v| keys_from_str(&v))
-                    .map(|keys| (publisher, keys))
+                    .map(|key| (publisher, key))
             })
-            .collect();
-        Ok(SecretStore { secrets: secrets? })
+    }
+
+    #[cfg(feature = "well_known")]
+    pub fn with_verify_keys_from_well_known(mut self, url: &str) -> Result<Self, String> {
+        let mut res =
+            reqwest::get(url).map_err(|e| format!("unable to get keys from well known: {}", e))?;
+        let mut json: Value = res
+            .json()
+            .map_err(|e| format!("well known return invalid json: {}", e))?;
+        if let Value::Object(keys) = json["api"]["publishers_jwks"].take() {
+            let verify_secrets: Result<HashMap<String, Secret>, String> = keys
+                .into_iter()
+                .map(|(provider, mut v)| {
+                    serde_json::from_value(v["keys"][0].take())
+                        .map_err(|e| format!("invalid jwk: {}", e))
+                        .and_then(|jwk| jwk_to_rsa_key_params(jwk))
+                        .map(|rsa| rsa.jws_public_key_secret())
+                        .map(|key| (provider, key))
+                })
+                .collect();
+            self.verify_secrets.extend(verify_secrets?);
+            Ok(self)
+        } else {
+            Err(format!("unable to retrieve signing keys from: {}", url))
+        }
     }
 }
 
@@ -151,7 +245,13 @@ fn to_der(jwk_rsa: RSAKeyParameters) -> Result<Vec<u8>, String> {
     Ok(der)
 }
 
-fn to_rsa_key_params(jwk: JWK<Empty>) -> Result<RSAKeyParameters, String> {
+fn jwk_str_to_rsa_key_params(key: &str) -> Result<RSAKeyParameters, String> {
+    let mut j = serde_json::Deserializer::from_str(key);
+    let jwk: JWK<Empty> =
+        JWK::deserialize(&mut j).map_err(|e| format!("error reading jwk: {}", e))?;
+    jwk_to_rsa_key_params(jwk)
+}
+fn jwk_to_rsa_key_params(jwk: JWK<Empty>) -> Result<RSAKeyParameters, String> {
     if let AlgorithmParameters::RSA(x) = jwk.algorithm {
         Ok(x)
     } else {
@@ -170,8 +270,8 @@ pub fn verify_attribute(attr: &impl Serialize, store: &SecretStore) -> Result<bo
     let publisher = attr_c["signature"]["publisher"]["name"]
         .as_str()
         .ok_or_else(|| String::from("publisher missing"))?;
-    let keys = store
-        .secrets
+    let key = store
+        .verify_secrets
         .get(publisher)
         .ok_or_else(|| format!("no keys for {}", publisher))?;
     let token = attr_c["signature"]["publisher"]["value"]
@@ -181,7 +281,7 @@ pub fn verify_attribute(attr: &impl Serialize, store: &SecretStore) -> Result<bo
         .unwrap();
     attr_c.as_object_mut().unwrap().remove("signature");
     let c: jws::Compact<biscuit::ClaimsSet<Value>, Empty> = jws::Compact::new_encoded(&token);
-    match c.decode(&keys.verify, jwa::SignatureAlgorithm::RS256) {
+    match c.decode(&key, jwa::SignatureAlgorithm::RS256) {
         Ok(c) => {
             let from_token = &c
                 .payload()
@@ -213,8 +313,8 @@ where
         .as_str()
         .map(|s| s.to_owned())
         .ok_or_else(|| String::from("publisher missing"))?;
-    let keys = store
-        .secrets
+    let key = store
+        .sign_secrets
         .get(&publisher)
         .ok_or_else(|| format!("no keys for {}", publisher))?;
     let _ = attr_c.remove("signature").unwrap_or_default();
@@ -233,7 +333,7 @@ where
     };
     let c = jws::Compact::new_decoded(header, claims);
     let c = c
-        .encode(&keys.sign)
+        .encode(&key)
         .map_err(|e| format!("error encoding jwt: {}", e))?;
     let token = c
         .encoded()
@@ -256,8 +356,44 @@ mod test {
 
     fn get_fake_store() -> SecretStore {
         let key = include_str!("../data/fake_key.json");
-        SecretStore::from_inline_iter(vec![(String::from("mozilliansorg"), key.to_owned())])
+        SecretStore::default()
+            .with_sign_keys_from_inline_iter(vec![(String::from("mozilliansorg"), key.to_owned())])
             .unwrap()
+            .with_verify_keys_from_inline_iter(vec![(
+                String::from("mozilliansorg"),
+                key.to_owned(),
+            )])
+            .unwrap()
+    }
+
+    #[test]
+    fn keys_from_jwks() {
+        let key = include_str!("../data/fake_key.json");
+        let store = SecretStore::default()
+            .with_sign_keys_from_inline_iter(vec![(String::from("mozilliansorg"), key.to_owned())])
+            .unwrap()
+            .with_verify_keys_from_inline_iter(vec![(
+                String::from("mozilliansorg"),
+                key.to_owned(),
+            )]);
+        assert!(store.is_ok())
+    }
+
+    #[test]
+    fn keys_from_pems() {
+        let private = include_str!("../data/fake_key_private.pem");
+        let public = include_str!("../data/fake_key_public.pem");
+        let store = SecretStore::default()
+            .with_sign_keys_from_inline_iter(vec![(
+                String::from("mozilliansorg"),
+                private.to_owned(),
+            )])
+            .unwrap()
+            .with_verify_keys_from_inline_iter(vec![(
+                String::from("mozilliansorg"),
+                public.to_owned(),
+            )]);
+        assert!(store.is_ok())
     }
 
     #[test]
@@ -378,10 +514,15 @@ mod aws_test {
     #[test]
     fn test_keys_from_ssm() -> Result<(), String> {
         if let Ok(mozillians_key_ssm_name) = env::var("CIS_SSM_MOZILLIANSORG_KEY") {
-            let store = SecretStore::from_ssm_iter(vec![(
-                String::from("mozilliansorg"),
-                mozillians_key_ssm_name,
-            )])?;
+            let store = SecretStore::default()
+                .with_sign_keys_from_ssm_iter(vec![(
+                    String::from("mozilliansorg"),
+                    mozillians_key_ssm_name.clone(),
+                )])?
+                .with_verify_keys_from_ssm_iter(vec![(
+                    String::from("mozilliansorg"),
+                    mozillians_key_ssm_name,
+                )])?;
             let mut attr: StandardAttributeString =
                 serde_json::from_str(include_str!("../data/attribute_invalid.json")).unwrap();
             sign_attribute(&mut attr, &store)?;
@@ -390,4 +531,19 @@ mod aws_test {
         }
         Ok(())
     }
+}
+
+#[cfg(feature = "well_known")]
+#[cfg(test)]
+mod well_known_test {
+    use super::*;
+
+    #[test]
+    fn test_keys_from_well_knwon() {
+        // check for ok once we fix x5c in the well-known
+        assert!(SecretStore::default()
+            .with_verify_keys_from_well_known("https://auth.allizom.org/.well-known/mozilla-iam")
+            .is_err());
+    }
+
 }

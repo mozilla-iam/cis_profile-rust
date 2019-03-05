@@ -1,35 +1,34 @@
-use crate::crypto::sign_attribute;
-use crate::crypto::SecretStore;
+use crate::crypto::Signer;
 use crate::schema::AccessInformationValuesArray;
 use crate::schema::IdentitiesAttributesValuesArray;
 use crate::schema::Profile;
 use crate::schema::StaffInformationValuesArray;
 
-pub fn sign_full_profile(profile: &mut Profile, store: &SecretStore) -> Result<(), String> {
-    sign_attribute(&mut profile.active, store)?;
-    sign_attribute(&mut profile.alternative_name, store)?;
-    sign_attribute(&mut profile.created, store)?;
-    sign_attribute(&mut profile.description, store)?;
-    sign_attribute(&mut profile.first_name, store)?;
-    sign_attribute(&mut profile.fun_title, store)?;
-    sign_attribute(&mut profile.languages, store)?;
-    sign_attribute(&mut profile.last_modified, store)?;
-    sign_attribute(&mut profile.last_name, store)?;
-    sign_attribute(&mut profile.location, store)?;
-    sign_attribute(&mut profile.login_method, store)?;
-    sign_attribute(&mut profile.pgp_public_keys, store)?;
-    sign_attribute(&mut profile.phone_numbers, store)?;
-    sign_attribute(&mut profile.picture, store)?;
-    sign_attribute(&mut profile.primary_email, store)?;
-    sign_attribute(&mut profile.primary_username, store)?;
-    sign_attribute(&mut profile.pronouns, store)?;
-    sign_attribute(&mut profile.ssh_public_keys, store)?;
-    sign_attribute(&mut profile.tags, store)?;
-    sign_attribute(&mut profile.timezone, store)?;
-    sign_attribute(&mut profile.uris, store)?;
-    sign_attribute(&mut profile.user_id, store)?;
-    sign_attribute(&mut profile.usernames, store)?;
-    sign_attribute(&mut profile.uuid, store)?;
+pub fn sign_full_profile(profile: &mut Profile, store: &impl Signer) -> Result<(), String> {
+    store.sign_attribute(&mut profile.active)?;
+    store.sign_attribute(&mut profile.alternative_name)?;
+    store.sign_attribute(&mut profile.created)?;
+    store.sign_attribute(&mut profile.description)?;
+    store.sign_attribute(&mut profile.first_name)?;
+    store.sign_attribute(&mut profile.fun_title)?;
+    store.sign_attribute(&mut profile.languages)?;
+    store.sign_attribute(&mut profile.last_modified)?;
+    store.sign_attribute(&mut profile.last_name)?;
+    store.sign_attribute(&mut profile.location)?;
+    store.sign_attribute(&mut profile.login_method)?;
+    store.sign_attribute(&mut profile.pgp_public_keys)?;
+    store.sign_attribute(&mut profile.phone_numbers)?;
+    store.sign_attribute(&mut profile.picture)?;
+    store.sign_attribute(&mut profile.primary_email)?;
+    store.sign_attribute(&mut profile.primary_username)?;
+    store.sign_attribute(&mut profile.pronouns)?;
+    store.sign_attribute(&mut profile.ssh_public_keys)?;
+    store.sign_attribute(&mut profile.tags)?;
+    store.sign_attribute(&mut profile.timezone)?;
+    store.sign_attribute(&mut profile.uris)?;
+    store.sign_attribute(&mut profile.user_id)?;
+    store.sign_attribute(&mut profile.usernames)?;
+    store.sign_attribute(&mut profile.uuid)?;
 
     sign_accessinformation(&mut profile.access_information, store)?;
     sign_identities(&mut profile.identities, store)?;
@@ -39,54 +38,55 @@ pub fn sign_full_profile(profile: &mut Profile, store: &SecretStore) -> Result<(
 
 fn sign_accessinformation(
     attr: &mut AccessInformationValuesArray,
-    store: &SecretStore,
+    store: &impl Signer,
 ) -> Result<(), String> {
-    sign_attribute(&mut attr.access_provider, store)?;
-    sign_attribute(&mut attr.hris, store)?;
-    sign_attribute(&mut attr.ldap, store)?;
-    sign_attribute(&mut attr.mozilliansorg, store)?;
+    store.sign_attribute(&mut attr.access_provider)?;
+    store.sign_attribute(&mut attr.hris)?;
+    store.sign_attribute(&mut attr.ldap)?;
+    store.sign_attribute(&mut attr.mozilliansorg)?;
     Ok(())
 }
 
 fn sign_identities(
     attr: &mut IdentitiesAttributesValuesArray,
-    store: &SecretStore,
+    store: &impl Signer,
 ) -> Result<(), String> {
-    sign_attribute(&mut attr.github_id_v3, store)?;
-    sign_attribute(&mut attr.github_id_v4, store)?;
-    sign_attribute(&mut attr.github_primary_email, store)?;
-    sign_attribute(&mut attr.mozilliansorg_id, store)?;
-    sign_attribute(&mut attr.bugzilla_mozilla_org_id, store)?;
-    sign_attribute(&mut attr.bugzilla_mozilla_org_primary_email, store)?;
-    sign_attribute(&mut attr.mozilla_ldap_id, store)?;
-    sign_attribute(&mut attr.mozilla_ldap_primary_email, store)?;
-    sign_attribute(&mut attr.mozilla_posix_id, store)?;
-    sign_attribute(&mut attr.google_oauth2_id, store)?;
-    sign_attribute(&mut attr.google_primary_email, store)?;
-    sign_attribute(&mut attr.firefox_accounts_id, store)?;
-    sign_attribute(&mut attr.firefox_accounts_primary_email, store)?;
+    store.sign_attribute(&mut attr.github_id_v3)?;
+    store.sign_attribute(&mut attr.github_id_v4)?;
+    store.sign_attribute(&mut attr.github_primary_email)?;
+    store.sign_attribute(&mut attr.mozilliansorg_id)?;
+    store.sign_attribute(&mut attr.bugzilla_mozilla_org_id)?;
+    store.sign_attribute(&mut attr.bugzilla_mozilla_org_primary_email)?;
+    store.sign_attribute(&mut attr.mozilla_ldap_id)?;
+    store.sign_attribute(&mut attr.mozilla_ldap_primary_email)?;
+    store.sign_attribute(&mut attr.mozilla_posix_id)?;
+    store.sign_attribute(&mut attr.google_oauth2_id)?;
+    store.sign_attribute(&mut attr.google_primary_email)?;
+    store.sign_attribute(&mut attr.firefox_accounts_id)?;
+    store.sign_attribute(&mut attr.firefox_accounts_primary_email)?;
     Ok(())
 }
 
 fn sign_staff_information(
     attr: &mut StaffInformationValuesArray,
-    store: &SecretStore,
+    store: &impl Signer,
 ) -> Result<(), String> {
-    sign_attribute(&mut attr.manager, store)?;
-    sign_attribute(&mut attr.director, store)?;
-    sign_attribute(&mut attr.staff, store)?;
-    sign_attribute(&mut attr.title, store)?;
-    sign_attribute(&mut attr.team, store)?;
-    sign_attribute(&mut attr.cost_center, store)?;
-    sign_attribute(&mut attr.worker_type, store)?;
-    sign_attribute(&mut attr.wpr_desk_number, store)?;
-    sign_attribute(&mut attr.office_location, store)?;
+    store.sign_attribute(&mut attr.manager)?;
+    store.sign_attribute(&mut attr.director)?;
+    store.sign_attribute(&mut attr.staff)?;
+    store.sign_attribute(&mut attr.title)?;
+    store.sign_attribute(&mut attr.team)?;
+    store.sign_attribute(&mut attr.cost_center)?;
+    store.sign_attribute(&mut attr.worker_type)?;
+    store.sign_attribute(&mut attr.wpr_desk_number)?;
+    store.sign_attribute(&mut attr.office_location)?;
     Ok(())
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::crypto::SecretStore;
 
     fn get_fake_store() -> SecretStore {
         let key = include_str!("../data/fake_key.json");
@@ -115,6 +115,7 @@ mod test {
 #[cfg(test)]
 mod test_make {
     use super::*;
+    use crate::crypto::SecretStore;
 
     use std::env;
 

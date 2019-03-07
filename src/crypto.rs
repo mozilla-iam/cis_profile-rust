@@ -440,7 +440,7 @@ mod well_known_test {
         // check for ok once we fix x5c in the well-known
         assert!(SecretStore::default()
             .with_verify_keys_from_well_known("https://auth.allizom.org/.well-known/mozilla-iam")
-            .is_err());
+            .is_ok());
     }
 
 }

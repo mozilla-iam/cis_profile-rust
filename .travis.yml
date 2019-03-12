@@ -14,7 +14,7 @@ before_script:
 
 script:
   - cargo fmt --all -- --check
-  - cargo clippy --features graphql,aws,well_known
+  - cargo clippy --features graphql,aws,well_known -- -D warnings
   - cargo build --all
   - cargo test --all
   - cargo build --all --features graphql,aws,well_known

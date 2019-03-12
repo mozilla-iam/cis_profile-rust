@@ -8,7 +8,7 @@ use num_bigint::BigUint;
 use openssl::bn::BigNum;
 use openssl::rsa::Rsa;
 use openssl::rsa::RsaPrivateKeyBuilder;
-use ring::signature::RSAKeyPair;
+use ring::signature::RsaKeyPair;
 use serde::Deserialize;
 use std::sync::Arc;
 use untrusted;
@@ -34,8 +34,8 @@ pub fn sign_key_from_str(s: &str) -> Result<Secret, String> {
 fn sign_key_from_pem(key: &str) -> Result<Secret, String> {
     let rsa = Rsa::private_key_from_pem(key.as_bytes())
         .map_err(|e| format!("error reading key: {}", e))?;
-    let sign = jws::Secret::RSAKeyPair(Arc::new(
-        RSAKeyPair::from_der(untrusted::Input::from(
+    let sign = jws::Secret::RsaKeyPair(Arc::new(
+        RsaKeyPair::from_der(untrusted::Input::from(
             &rsa.private_key_to_der()
                 .map_err(|e| format!("error converting key: {}", e))?,
         ))
@@ -66,8 +66,8 @@ fn verify_key_from_private_pem(key: &str) -> Result<Secret, String> {
 
 pub fn sign_key_from_jwk(key: &str) -> Result<Secret, String> {
     let rsa = jwk_str_to_rsa_key_params(key)?;
-    let sign = jws::Secret::RSAKeyPair(Arc::new(
-        RSAKeyPair::from_der(untrusted::Input::from(&to_der(rsa)?))
+    let sign = jws::Secret::RsaKeyPair(Arc::new(
+        RsaKeyPair::from_der(untrusted::Input::from(&to_der(rsa)?))
             .map_err(|e| format!("error converting to der: {}", e))?,
     ));
     Ok(sign)

@@ -10,22 +10,24 @@ pub trait Sign {
     fn sign(&mut self, publisher: Publisher);
 }
 
+/// We only suppet String → String dictionaries for now.
 #[derive(Default, Clone, PartialEq, Debug, Deserialize, Serialize)]
-pub struct KeyValue(pub BTreeMap<String, serde_json::Value>);
+pub struct KeyValue(pub BTreeMap<String, Option<String>>);
 
-// this uses strings to convert between juniper and json: FIXME
 #[cfg(feature = "graphql")]
 graphql_scalar!(KeyValue as "KeyValue" where Scalar = <S> {
     resolve(&self) -> Value {
         Value::Object(
             juniper::Object::from_iter(
                 self.0.iter()
-                    .map(|(k, v)| (k.clone(), juniper::Value::from(serde_json::to_string(v).unwrap())))))
+                    .map(|(k, v)| (k.clone(), Value::from(v.clone())))))
     }
     from_input_value(v: &InputValue) -> Option<KeyValue> {
-        v.to_object_value().map(|o| KeyValue(BTreeMap::from_iter(o.iter().map(|(k,v)| (String::from(*k), {
-            serde_json::from_str(&v.to_string()).unwrap()
-        })))))
+        v.to_object_value().map(|o| {
+            KeyValue(BTreeMap::from_iter(o.iter().map(|(k, v)| {
+                (String::from(*k), v.as_scalar_value::<String>().cloned())
+            })))
+        })
     }
     from_str<'a>(value: ScalarToken<'a>) -> juniper::ParseScalarResult<'a, S> {
         <String as ParseScalarValue<S>>::from_str(value)

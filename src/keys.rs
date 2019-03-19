@@ -83,7 +83,7 @@ pub fn verify_key_from_jwk(key: &str) -> Result<Secret, String> {
 pub fn to_der(jwk_rsa: RSAKeyParameters) -> Result<Vec<u8>, String> {
     let n = jwk_rsa.n;
     let e = jwk_rsa.e;
-    let d = jwk_rsa.d.ok_or_else(|| String::from("no d"))?;;
+    let d = jwk_rsa.d.ok_or_else(|| String::from("no d"))?;
     let p = jwk_rsa.p.ok_or_else(|| String::from("no p"))?;
     let q = jwk_rsa.q.ok_or_else(|| String::from("no q"))?;
     let dp = jwk_rsa.dp.ok_or_else(|| String::from("no dp"))?;

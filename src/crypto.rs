@@ -399,6 +399,28 @@ mod test_secret_store {
             )]);
         assert!(store.is_ok())
     }
+
+    #[test]
+    fn sign_wtih_pem_verify_with_jwk() -> Result<(), String> {
+        let private = include_str!("../data/fake_key_private.pem");
+        let public = include_str!("../data/fake_key.json");
+        let store = SecretStore::default()
+            .with_sign_keys_from_inline_iter(vec![(
+                String::from("mozilliansorg"),
+                private.to_owned(),
+            )])
+            .unwrap()
+            .with_verify_keys_from_inline_iter(vec![(
+                String::from("mozilliansorg"),
+                public.to_owned(),
+            )])?;
+        let mut attr: StandardAttributeString =
+            serde_json::from_str(include_str!("../data/attribute_invalid.json")).unwrap();
+        store.sign_attribute(&mut attr)?;
+        let valid = store.verify_attribute(&attr)?;
+        assert!(valid);
+        Ok(())
+    }
 }
 
 #[cfg(feature = "aws")]

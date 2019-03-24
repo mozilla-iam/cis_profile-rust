@@ -3,8 +3,9 @@ use crate::schema::AccessInformationValuesArray;
 use crate::schema::IdentitiesAttributesValuesArray;
 use crate::schema::Profile;
 use crate::schema::StaffInformationValuesArray;
+use failure::Error;
 
-pub fn sign_full_profile(profile: &mut Profile, store: &impl Signer) -> Result<(), String> {
+pub fn sign_full_profile(profile: &mut Profile, store: &impl Signer) -> Result<(), Error> {
     store.sign_attribute(&mut profile.active)?;
     store.sign_attribute(&mut profile.alternative_name)?;
     store.sign_attribute(&mut profile.created)?;
@@ -39,7 +40,7 @@ pub fn sign_full_profile(profile: &mut Profile, store: &impl Signer) -> Result<(
 fn sign_accessinformation(
     attr: &mut AccessInformationValuesArray,
     store: &impl Signer,
-) -> Result<(), String> {
+) -> Result<(), Error> {
     store.sign_attribute(&mut attr.access_provider)?;
     store.sign_attribute(&mut attr.hris)?;
     store.sign_attribute(&mut attr.ldap)?;
@@ -50,7 +51,7 @@ fn sign_accessinformation(
 fn sign_identities(
     attr: &mut IdentitiesAttributesValuesArray,
     store: &impl Signer,
-) -> Result<(), String> {
+) -> Result<(), Error> {
     store.sign_attribute(&mut attr.github_id_v3)?;
     store.sign_attribute(&mut attr.github_id_v4)?;
     store.sign_attribute(&mut attr.github_primary_email)?;
@@ -70,7 +71,7 @@ fn sign_identities(
 fn sign_staff_information(
     attr: &mut StaffInformationValuesArray,
     store: &impl Signer,
-) -> Result<(), String> {
+) -> Result<(), Error> {
     store.sign_attribute(&mut attr.manager)?;
     store.sign_attribute(&mut attr.director)?;
     store.sign_attribute(&mut attr.staff)?;
@@ -102,10 +103,10 @@ mod test {
     }
 
     #[test]
-    fn test_sign_full_profile() -> Result<(), String> {
+    fn test_sign_full_profile() -> Result<(), Error> {
         let store = get_fake_store();
         let mut profile: Profile =
-            serde_json::from_str(include_str!("../data/user_profile_null.json")).unwrap();
+            serde_json::from_str(include_str!("../data/user_profile_null.json"))?;
         sign_full_profile(&mut profile, &store)?;
         Ok(())
     }
@@ -153,7 +154,7 @@ mod test_make {
     }
 
     #[test]
-    fn test_make_profile() -> Result<(), String> {
+    fn test_make_profile() -> Result<(), Error> {
         if let Some(store) = get_store() {
             let mut profile: Profile =
                 serde_json::from_str(include_str!("../data/user_profile_null_create.json"))

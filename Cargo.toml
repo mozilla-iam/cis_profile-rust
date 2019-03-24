@@ -1,6 +1,6 @@
 [package]
 name = "cis_profile"
-version = "0.1.0"
+version = "0.0.2"
 authors = ["Florian Merz <flomerz@gmail.com>"]
 edition = "2018"
 license = "MIT"
@@ -28,6 +28,8 @@ serde_derive = "1.0.80"
 serde_json = { version = "1.0.32", features = ["preserve_order"] }
 chrono = "0.4"
 chrono-tz = "0.5"
+failure = "0.1.5"
+failure_derive = "0.1.5"
 
 juniper = { version = "0.11.1", optional = true }
 rusoto_core = { version = "0.37.0", optional = true }

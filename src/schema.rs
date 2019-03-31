@@ -1,10 +1,9 @@
 #[cfg(feature = "graphql")]
 use juniper::{GraphQLEnum, GraphQLObject, ParseScalarValue, Value};
-#[cfg(feature = "graphql")]
-use std::iter::FromIterator;
-
 use serde_derive::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+#[cfg(feature = "graphql")]
+use std::iter::FromIterator;
 
 pub trait Sign {
     fn sign(&mut self, publisher: Publisher);
@@ -113,6 +112,19 @@ pub enum Display {
     Staff,
     #[serde(rename = "private")]
     Private,
+}
+
+impl Display {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Display::Public => "public",
+            Display::Authenticated => "authenticated",
+            Display::Vouched => "vouched",
+            Display::Ndaed => "ndaed",
+            Display::Staff => "staff",
+            Display::Private => "private",
+        }
+    }
 }
 
 #[cfg_attr(feature = "graphql", derive(GraphQLObject))]
@@ -546,6 +558,7 @@ impl Default for Profile {
 #[cfg(test)]
 mod test {
     use super::*;
+    use failure::Error;
 
     #[test]
     fn basic_profile() {
@@ -568,5 +581,34 @@ mod test {
             profile.unwrap().primary_username.value,
             Some(String::from("fiji"))
         );
+    }
+
+    #[test]
+    fn test_display_to_str() -> Result<(), Error> {
+        assert_eq!(
+            format!(r#""{}""#, Display::Public.as_str()),
+            serde_json::to_string(&Display::Public)?
+        );
+        assert_eq!(
+            format!(r#""{}""#, Display::Authenticated.as_str()),
+            serde_json::to_string(&Display::Authenticated)?
+        );
+        assert_eq!(
+            format!(r#""{}""#, Display::Vouched.as_str()),
+            serde_json::to_string(&Display::Vouched)?
+        );
+        assert_eq!(
+            format!(r#""{}""#, Display::Ndaed.as_str()),
+            serde_json::to_string(&Display::Ndaed)?
+        );
+        assert_eq!(
+            format!(r#""{}""#, Display::Staff.as_str()),
+            serde_json::to_string(&Display::Staff)?
+        );
+        assert_eq!(
+            format!(r#""{}""#, Display::Private.as_str()),
+            serde_json::to_string(&Display::Private)?
+        );
+        Ok(())
     }
 }

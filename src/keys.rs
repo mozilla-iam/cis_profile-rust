@@ -11,7 +11,7 @@ use num_bigint::BigUint;
 use openssl::bn::BigNum;
 use openssl::rsa::Rsa;
 use openssl::rsa::RsaPrivateKeyBuilder;
-use ring::signature::RSAKeyPair;
+use ring::signature::RsaKeyPair;
 use serde::Deserialize;
 use std::sync::Arc;
 use untrusted;
@@ -36,7 +36,7 @@ pub fn sign_key_from_str(s: &str) -> Result<Secret, Error> {
 
 fn sign_key_from_pem(key: &str) -> Result<Secret, Error> {
     let rsa = Rsa::private_key_from_pem(key.as_bytes())?;
-    let sign = jws::Secret::RSAKeyPair(Arc::new(RSAKeyPair::from_der(untrusted::Input::from(
+    let sign = jws::Secret::RsaKeyPair(Arc::new(RsaKeyPair::from_der(untrusted::Input::from(
         &rsa.private_key_to_der()?,
     ))?));
     Ok(sign)
@@ -62,7 +62,7 @@ fn verify_key_from_private_pem(key: &str) -> Result<Secret, Error> {
 
 pub fn sign_key_from_jwk(key: &str) -> Result<Secret, Error> {
     let rsa = jwk_str_to_rsa_key_params(key)?;
-    let sign = jws::Secret::RSAKeyPair(Arc::new(RSAKeyPair::from_der(untrusted::Input::from(
+    let sign = jws::Secret::RsaKeyPair(Arc::new(RsaKeyPair::from_der(untrusted::Input::from(
         &to_der(rsa)?,
     ))?));
     Ok(sign)

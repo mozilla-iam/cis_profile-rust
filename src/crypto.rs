@@ -62,7 +62,7 @@ impl Signer for SecretStore {
         let publisher = attr_c["signature"]["publisher"]["name"]
             .clone()
             .as_str()
-            .map(|s| s.to_owned())
+            .map(ToOwned::to_owned)
             .ok_or_else(|| SignerVerifierError::NoPublisher)?;
         let key = self
             .sign_secrets
@@ -202,7 +202,7 @@ impl SecretStore {
                 ssm_client
                     .get_parameter(req)
                     .sync()
-                    .map_err(|e| SsmError::GetParamterFailed(e).into())
+                    .map_err(Into::into)
                     .and_then(|p| p.parameter.ok_or_else(|| SsmError::NoParameter.into()))
                     .and_then(|p| p.value.ok_or_else(|| SsmError::NoValue.into()))
                     .map(|key| (publisher, key))

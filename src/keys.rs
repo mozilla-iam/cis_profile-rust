@@ -16,6 +16,8 @@ use serde::Deserialize;
 use std::sync::Arc;
 use untrusted;
 
+/// Parse verification key from a string.
+/// This supports _RSA private key_/_RSA public key_ PEMs and JWKs.
 pub fn verify_key_from_str(s: &str) -> Result<Secret, Error> {
     if s.starts_with("-----BEGIN RSA PRIVATE KEY-----") {
         verify_key_from_private_pem(s)
@@ -26,6 +28,8 @@ pub fn verify_key_from_str(s: &str) -> Result<Secret, Error> {
     }
 }
 
+/// Parse signing key from a string.
+/// This supports _RSA private key_ PEMs and JWKs.
 pub fn sign_key_from_str(s: &str) -> Result<Secret, Error> {
     if s.starts_with("-----BEGIN RSA PRIVATE KEY-----") {
         sign_key_from_pem(s)
@@ -60,7 +64,7 @@ fn verify_key_from_private_pem(key: &str) -> Result<Secret, Error> {
     Ok(verify)
 }
 
-pub fn sign_key_from_jwk(key: &str) -> Result<Secret, Error> {
+fn sign_key_from_jwk(key: &str) -> Result<Secret, Error> {
     let rsa = jwk_str_to_rsa_key_params(key)?;
     let sign = jws::Secret::RsaKeyPair(Arc::new(RsaKeyPair::from_der(untrusted::Input::from(
         &to_der(rsa)?,
@@ -68,12 +72,13 @@ pub fn sign_key_from_jwk(key: &str) -> Result<Secret, Error> {
     Ok(sign)
 }
 
-pub fn verify_key_from_jwk(key: &str) -> Result<Secret, Error> {
+fn verify_key_from_jwk(key: &str) -> Result<Secret, Error> {
     let rsa = jwk_str_to_rsa_key_params(key)?;
     let verify = rsa.jws_public_key_secret();
     Ok(verify)
 }
 
+/// Maps a `biscuit` jwk RSA key to an `openssl` RSA key and returns it in DER format.
 #[allow(clippy::many_single_char_names)]
 pub fn to_der(jwk_rsa: RSAKeyParameters) -> Result<Vec<u8>, Error> {
     let n = jwk_rsa.n;
@@ -108,16 +113,18 @@ pub fn to_der(jwk_rsa: RSAKeyParameters) -> Result<Vec<u8>, Error> {
     Ok(der)
 }
 
-pub fn jwk_str_to_rsa_key_params(key: &str) -> Result<RSAKeyParameters, Error> {
-    let mut j = serde_json::Deserializer::from_str(key);
-    let jwk: JWK<Empty> = JWK::deserialize(&mut j)?;
-    jwk_to_rsa_key_params(jwk)
-}
-
+// Converts a `JWK` to `RSAKeyParameters`.
 pub fn jwk_to_rsa_key_params(jwk: JWK<Empty>) -> Result<RSAKeyParameters, Error> {
     if let AlgorithmParameters::RSA(x) = jwk.algorithm {
         Ok(x)
     } else {
         Err(KeyError::NoRsaJwk.into())
     }
+}
+
+// Converts a `JWK` (string) to `RSAKeyParameters`.
+pub fn jwk_str_to_rsa_key_params(key: &str) -> Result<RSAKeyParameters, Error> {
+    let mut j = serde_json::Deserializer::from_str(key);
+    let jwk: JWK<Empty> = JWK::deserialize(&mut j)?;
+    jwk_to_rsa_key_params(jwk)
 }

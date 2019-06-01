@@ -1,12 +1,23 @@
+use crate::error::SignerVerifierError;
+use failure::Error;
 #[cfg(feature = "graphql")]
 use juniper::{GraphQLEnum, GraphQLObject, ParseScalarValue, Value};
 use serde_derive::{Deserialize, Serialize};
+use serde_json;
 use std::collections::BTreeMap;
 #[cfg(feature = "graphql")]
 use std::iter::FromIterator;
 
-pub trait Sign {
-    fn sign(&mut self, publisher: Publisher);
+/// Trait implement by field types. Exposes the publisher of a field for signing and verifying.
+pub trait WithPublisher {
+    /// Set the publisher.
+    fn set_publisher(&mut self, publisher: Publisher);
+    // Retrieve data as `Value`. For field typed this should return the payload to sign or verify.
+    fn data(&self) -> Result<serde_json::Value, Error>;
+    // Retrieve the publisher.
+    fn get_publisher(&self) -> &Publisher;
+    // Check wether the field type shoud be considered empty.
+    fn is_empty(&self) -> bool;
 }
 
 /// We only suppet String → String dictionaries for now.
@@ -57,9 +68,23 @@ impl AccessInformationProviderSubObject {
     }
 }
 
-impl Sign for AccessInformationProviderSubObject {
-    fn sign(&mut self, publisher: Publisher) {
+impl WithPublisher for AccessInformationProviderSubObject {
+    fn set_publisher(&mut self, publisher: Publisher) {
         self.signature.publisher = publisher;
+    }
+    fn get_publisher(&self) -> &Publisher {
+        &self.signature.publisher
+    }
+    fn data(&self) -> Result<serde_json::Value, Error> {
+        let mut c = match serde_json::to_value(self) {
+            Ok(serde_json::Value::Object(o)) => o,
+            _ => return Err(SignerVerifierError::NonObjectAttribute.into()),
+        };
+        c.remove("signature");
+        Ok(serde_json::Value::from(c))
+    }
+    fn is_empty(&self) -> bool {
+        self.values.is_none()
     }
 }
 
@@ -76,6 +101,7 @@ pub enum Alg {
     Ed25519,
 }
 
+/// Data classification for fields.
 #[cfg_attr(feature = "graphql", derive(GraphQLEnum))]
 #[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
 pub enum Classification {
@@ -97,6 +123,9 @@ impl Default for Classification {
     }
 }
 
+/// Display level for fields. This reflects a users preference and may overrule data classification
+/// for displaying purposes. The values are ordered and implicitly include all stricter display
+/// levels (e.g. `ndaed` includes `staff` and `private`).
 #[cfg_attr(feature = "graphql", derive(GraphQLEnum))]
 #[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
 pub enum Display {
@@ -155,6 +184,7 @@ impl Metadata {
     }
 }
 
+/// Publisher authorities in the IAM project.
 #[cfg_attr(feature = "graphql", derive(GraphQLEnum))]
 #[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
 pub enum PublisherAuthority {
@@ -168,6 +198,18 @@ pub enum PublisherAuthority {
     Cis,
     #[serde(rename = "access_provider")]
     AccessProvider,
+}
+
+impl PublisherAuthority {
+    pub fn as_str(&self) -> &str {
+        match *self {
+            PublisherAuthority::Ldap => "ldap",
+            PublisherAuthority::Mozilliansorg => "mozilliansorg",
+            PublisherAuthority::Hris => "hris",
+            PublisherAuthority::Cis => "cis",
+            PublisherAuthority::AccessProvider => "access_provider",
+        }
+    }
 }
 
 #[cfg_attr(feature = "graphql", derive(GraphQLObject))]
@@ -227,9 +269,23 @@ impl StandardAttributeBoolean {
     }
 }
 
-impl Sign for StandardAttributeBoolean {
-    fn sign(&mut self, publisher: Publisher) {
+impl WithPublisher for StandardAttributeBoolean {
+    fn set_publisher(&mut self, publisher: Publisher) {
         self.signature.publisher = publisher;
+    }
+    fn get_publisher(&self) -> &Publisher {
+        &self.signature.publisher
+    }
+    fn data(&self) -> Result<serde_json::Value, Error> {
+        let mut c = match serde_json::to_value(self) {
+            Ok(serde_json::Value::Object(o)) => o,
+            _ => return Err(SignerVerifierError::NonObjectAttribute.into()),
+        };
+        c.remove("signature");
+        Ok(serde_json::Value::from(c))
+    }
+    fn is_empty(&self) -> bool {
+        self.value.is_none()
     }
 }
 
@@ -252,9 +308,23 @@ impl StandardAttributeString {
     }
 }
 
-impl Sign for StandardAttributeString {
-    fn sign(&mut self, publisher: Publisher) {
+impl WithPublisher for StandardAttributeString {
+    fn set_publisher(&mut self, publisher: Publisher) {
         self.signature.publisher = publisher;
+    }
+    fn get_publisher(&self) -> &Publisher {
+        &self.signature.publisher
+    }
+    fn data(&self) -> Result<serde_json::Value, Error> {
+        let mut c = match serde_json::to_value(self) {
+            Ok(serde_json::Value::Object(o)) => o,
+            _ => return Err(SignerVerifierError::NonObjectAttribute.into()),
+        };
+        c.remove("signature");
+        Ok(serde_json::Value::from(c))
+    }
+    fn is_empty(&self) -> bool {
+        self.value.is_none()
     }
 }
 
@@ -276,9 +346,23 @@ impl StandardAttributeValues {
     }
 }
 
-impl Sign for StandardAttributeValues {
-    fn sign(&mut self, publisher: Publisher) {
+impl WithPublisher for StandardAttributeValues {
+    fn set_publisher(&mut self, publisher: Publisher) {
         self.signature.publisher = publisher;
+    }
+    fn get_publisher(&self) -> &Publisher {
+        &self.signature.publisher
+    }
+    fn data(&self) -> Result<serde_json::Value, Error> {
+        let mut c = match serde_json::to_value(self) {
+            Ok(serde_json::Value::Object(o)) => o,
+            _ => return Err(SignerVerifierError::NonObjectAttribute.into()),
+        };
+        c.remove("signature");
+        Ok(serde_json::Value::from(c))
+    }
+    fn is_empty(&self) -> bool {
+        self.values.is_none()
     }
 }
 

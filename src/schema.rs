@@ -127,7 +127,7 @@ impl Default for Classification {
 /// for displaying purposes. The values are ordered and implicitly include all stricter display
 /// levels (e.g. `ndaed` includes `staff` and `private`).
 #[cfg_attr(feature = "graphql", derive(GraphQLEnum))]
-#[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
+#[derive(Clone, PartialEq, PartialOrd, Debug, Deserialize, Serialize)]
 pub enum Display {
     #[serde(rename = "public")]
     Public,
@@ -694,5 +694,17 @@ mod test {
             serde_json::to_string(&Display::Private)?
         );
         Ok(())
+    }
+
+    #[test]
+    fn test_display_order() {
+        assert_eq!(Display::Private > Display::Staff, true);
+        assert_eq!(Display::Staff >= Display::Staff, true);
+        assert_eq!(Display::Staff > Display::Ndaed, true);
+        assert_eq!(Display::Public < Display::Staff, true);
+        assert_eq!(Display::Public < Display::Ndaed, true);
+        assert_eq!(Display::Public < Display::Vouched, true);
+        assert_eq!(Display::Public < Display::Authenticated, true);
+        assert_eq!(Display::Public <= Display::Public, true);
     }
 }

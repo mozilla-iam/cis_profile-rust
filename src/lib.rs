@@ -1,7 +1,6 @@
 extern crate biscuit;
 extern crate chrono;
 extern crate chrono_tz;
-extern crate failure;
 extern crate num_bigint;
 extern crate openssl;
 extern crate ring;
@@ -10,6 +9,8 @@ extern crate serde_derive;
 extern crate serde_json;
 extern crate untrusted;
 
+#[macro_use]
+extern crate failure;
 #[macro_use]
 extern crate failure_derive;
 

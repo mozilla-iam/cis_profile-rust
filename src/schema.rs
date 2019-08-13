@@ -5,6 +5,7 @@ use juniper::{GraphQLEnum, GraphQLObject, ParseScalarValue, Value};
 use serde_derive::{Deserialize, Serialize};
 use serde_json;
 use std::collections::BTreeMap;
+use std::convert::TryFrom;
 #[cfg(feature = "graphql")]
 use std::iter::FromIterator;
 
@@ -156,6 +157,22 @@ impl Display {
     }
 }
 
+impl TryFrom<&str> for Display {
+    type Error = Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Ok(match value.to_lowercase().as_str() {
+            "public" => Display::Public,
+            "authenticated" => Display::Authenticated,
+            "vouched" => Display::Vouched,
+            "ndaed" => Display::Ndaed,
+            "staff" => Display::Staff,
+            "private" => Display::Private,
+            _ => return Err(format_err!("invalid display value: {}", value)),
+        })
+    }
+}
+
 #[cfg_attr(feature = "graphql", derive(GraphQLObject))]
 #[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
 pub struct Metadata {
@@ -209,6 +226,21 @@ impl PublisherAuthority {
             PublisherAuthority::Cis => "cis",
             PublisherAuthority::AccessProvider => "access_provider",
         }
+    }
+}
+
+impl TryFrom<&str> for PublisherAuthority {
+    type Error = Error;
+
+    fn try_from(value: &str) -> Result<Self, Self::Error> {
+        Ok(match value.to_lowercase().as_str() {
+            "ldap" => PublisherAuthority::Ldap,
+            "mozilliansorg" => PublisherAuthority::Mozilliansorg,
+            "hris" => PublisherAuthority::Hris,
+            "cis" => PublisherAuthority::Cis,
+            "access_provider" => PublisherAuthority::AccessProvider,
+            _ => return Err(format_err!("invalid publisher value: {}", value)),
+        })
     }
 }
 
@@ -697,6 +729,18 @@ mod test {
     }
 
     #[test]
+    fn test_display_from_str() -> Result<(), Error> {
+        assert_eq!(Display::try_from("public")?, Display::Public);
+        assert_eq!(Display::try_from("AUTHENTICATED")?, Display::Authenticated);
+        assert_eq!(Display::try_from("Vouched")?, Display::Vouched);
+        assert_eq!(Display::try_from("ndaed")?, Display::Ndaed);
+        assert_eq!(Display::try_from("staff")?, Display::Staff);
+        assert_eq!(Display::try_from("private")?, Display::Private);
+        assert!(Display::try_from("foobar").is_err());
+        Ok(())
+    }
+
+    #[test]
     fn test_display_order() {
         assert_eq!(Display::Private > Display::Staff, true);
         assert_eq!(Display::Staff >= Display::Staff, true);
@@ -706,5 +750,39 @@ mod test {
         assert_eq!(Display::Public < Display::Vouched, true);
         assert_eq!(Display::Public < Display::Authenticated, true);
         assert_eq!(Display::Public <= Display::Public, true);
+    }
+
+    #[test]
+    fn test_publisher_authority_to_from_str() -> Result<(), Error> {
+        assert_eq!(
+            PublisherAuthority::AccessProvider.as_str(),
+            "access_provider"
+        );
+        assert_eq!(PublisherAuthority::Cis.as_str(), "cis");
+        assert_eq!(PublisherAuthority::Hris.as_str(), "hris");
+        assert_eq!(PublisherAuthority::Ldap.as_str(), "ldap");
+        assert_eq!(PublisherAuthority::Mozilliansorg.as_str(), "mozilliansorg");
+        assert_eq!(
+            PublisherAuthority::try_from("access_provider")?,
+            PublisherAuthority::AccessProvider
+        );
+        assert_eq!(
+            PublisherAuthority::try_from("Cis")?,
+            PublisherAuthority::Cis
+        );
+        assert_eq!(
+            PublisherAuthority::try_from("HRIS")?,
+            PublisherAuthority::Hris
+        );
+        assert_eq!(
+            PublisherAuthority::try_from("ldap")?,
+            PublisherAuthority::Ldap
+        );
+        assert_eq!(
+            PublisherAuthority::try_from("mozilliansorg")?,
+            PublisherAuthority::Mozilliansorg
+        );
+        assert!(PublisherAuthority::try_from("foobar").is_err());
+        Ok(())
     }
 }

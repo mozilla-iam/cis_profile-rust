@@ -1,6 +1,6 @@
 [package]
 name = "cis_profile"
-version = "0.1.2"
+version = "0.1.3"
 authors = ["Florian Merz <flomerz@gmail.com>"]
 edition = "2018"
 license = "MIT"
@@ -12,6 +12,7 @@ readme = "README.md"
 include = ["Cargo.toml", "src/**/*.rs", "data/", "README.md", "LICENSE", "CODE_OF_CONDUCT.md"]
 
 [features]
+default = []
 graphql = ["juniper"]
 aws = ["rusoto_core", "rusoto_ssm"]
 well_known = ["reqwest"]
@@ -31,7 +32,7 @@ chrono-tz = "0.5"
 failure = "0.1"
 failure_derive = "0.1"
 
-juniper = { version = "0.13", optional = true }
-rusoto_core = { version = "0.40", optional = true }
-rusoto_ssm = { version = "0.40", optional = true }
+juniper = { version = "0.14", optional = true }
+rusoto_core = { version = "0.41", optional = true }
+rusoto_ssm = { version = "0.41", optional = true }
 reqwest = { version = "0.9", optional = true }

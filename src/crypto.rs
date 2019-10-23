@@ -222,7 +222,7 @@ impl SecretStore {
             self.verify_secrets.extend(verify_secrets?);
             Ok(self)
         } else {
-            Err(WellKnownError::RetrieveVerifyKeysFailed)?
+            Err(WellKnownError::RetrieveVerifyKeysFailed.into())
         }
     }
 }
@@ -453,5 +453,4 @@ mod well_known_test {
             .with_verify_keys_from_well_known("https://auth.allizom.org/.well-known/mozilla-iam")
             .is_ok());
     }
-
 }

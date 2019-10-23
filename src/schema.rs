@@ -466,6 +466,12 @@ pub struct IdentitiesAttributesValuesArray {
     pub firefox_accounts_id: StandardAttributeString,
     #[serde(default)]
     pub firefox_accounts_primary_email: StandardAttributeString,
+    #[serde(default)]
+    pub custom_1_primary_email: StandardAttributeString,
+    #[serde(default)]
+    pub custom_2_primary_email: StandardAttributeString,
+    #[serde(default)]
+    pub custom_3_primary_email: StandardAttributeString,
 }
 
 impl Default for IdentitiesAttributesValuesArray {
@@ -502,6 +508,18 @@ impl Default for IdentitiesAttributesValuesArray {
             ),
             firefox_accounts_id: StandardAttributeString::default(),
             firefox_accounts_primary_email: StandardAttributeString::with(
+                Some(Display::Public),
+                Classification::default(),
+            ),
+            custom_1_primary_email: StandardAttributeString::with(
+                Some(Display::Public),
+                Classification::default(),
+            ),
+            custom_2_primary_email: StandardAttributeString::with(
+                Some(Display::Public),
+                Classification::default(),
+            ),
+            custom_3_primary_email: StandardAttributeString::with(
                 Some(Display::Public),
                 Classification::default(),
             ),

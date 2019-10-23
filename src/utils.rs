@@ -66,6 +66,9 @@ fn sign_identities(
     store.sign_attribute(&mut attr.google_primary_email)?;
     store.sign_attribute(&mut attr.firefox_accounts_id)?;
     store.sign_attribute(&mut attr.firefox_accounts_primary_email)?;
+    store.sign_attribute(&mut attr.custom_1_primary_email)?;
+    store.sign_attribute(&mut attr.custom_2_primary_email)?;
+    store.sign_attribute(&mut attr.custom_3_primary_email)?;
     Ok(())
 }
 

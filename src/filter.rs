@@ -41,9 +41,7 @@ impl Filtered for AccessInformationValuesArray {
                 .filtered(default.access_provider, display),
             hris: self.hris.filtered(default.hris, display),
             ldap: self.ldap.filtered(default.ldap, display),
-            mozilliansorg: self
-                .mozilliansorg
-                .filtered(default.mozilliansorg, display),
+            mozilliansorg: self.mozilliansorg.filtered(default.mozilliansorg, display),
         }
     }
 }
@@ -71,12 +69,8 @@ impl Filtered for StaffInformationValuesArray {
 impl Filtered for IdentitiesAttributesValuesArray {
     fn filtered(self: &Self, default: Self, display: &Display) -> Self {
         IdentitiesAttributesValuesArray {
-            github_id_v3: self
-                .github_id_v3
-                .filtered(default.github_id_v3, display),
-            github_id_v4: self
-                .github_id_v4
-                .filtered(default.github_id_v4, display),
+            github_id_v3: self.github_id_v3.filtered(default.github_id_v3, display),
+            github_id_v4: self.github_id_v4.filtered(default.github_id_v4, display),
             github_primary_email: self
                 .github_primary_email
                 .filtered(default.github_primary_email, display),
@@ -139,24 +133,16 @@ impl Filtered for Profile {
             fun_title: self.fun_title.filtered(default.fun_title, display),
             identities: self.identities.filtered(default.identities, display),
             languages: self.languages.filtered(default.languages, display),
-            last_modified: self
-                .last_modified
-                .filtered(default.last_modified, display),
+            last_modified: self.last_modified.filtered(default.last_modified, display),
             last_name: self.last_name.filtered(default.last_name, display),
             location: self.location.filtered(default.location, display),
-            login_method: self
-                .login_method
-                .filtered(default.login_method, display),
+            login_method: self.login_method.filtered(default.login_method, display),
             pgp_public_keys: self
                 .pgp_public_keys
                 .filtered(default.pgp_public_keys, display),
-            phone_numbers: self
-                .phone_numbers
-                .filtered(default.phone_numbers, display),
+            phone_numbers: self.phone_numbers.filtered(default.phone_numbers, display),
             picture: self.picture.filtered(default.picture, display),
-            primary_email: self
-                .primary_email
-                .filtered(default.primary_email, display),
+            primary_email: self.primary_email.filtered(default.primary_email, display),
             primary_username: self
                 .primary_username
                 .filtered(default.primary_username, display),

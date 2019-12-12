@@ -14,7 +14,6 @@ use openssl::rsa::RsaPrivateKeyBuilder;
 use ring::signature::RsaKeyPair;
 use serde::Deserialize;
 use std::sync::Arc;
-use untrusted;
 
 /// Parse verification key from a string.
 /// This supports _RSA private key_/_RSA public key_ PEMs and JWKs.
@@ -39,10 +38,11 @@ pub fn sign_key_from_str(s: &str) -> Result<Secret, Error> {
 }
 
 fn sign_key_from_pem(key: &str) -> Result<Secret, Error> {
-    let rsa = Rsa::private_key_from_pem(key.as_bytes())?;
-    let sign = jws::Secret::RsaKeyPair(Arc::new(RsaKeyPair::from_der(untrusted::Input::from(
-        &rsa.private_key_to_der()?,
-    ))?));
+    let rsa = Rsa::private_key_from_pem(key.as_bytes()).map_err(|_| KeyError::NoRsaPem)?;
+    let sign = jws::Secret::RsaKeyPair(Arc::new(
+        RsaKeyPair::from_der(&rsa.private_key_to_der().map_err(|_| KeyError::NoRsaPem)?)
+            .map_err(|_| KeyError::NoRsaPem)?,
+    ));
     Ok(sign)
 }
 
@@ -65,10 +65,11 @@ fn verify_key_from_private_pem(key: &str) -> Result<Secret, Error> {
 }
 
 fn sign_key_from_jwk(key: &str) -> Result<Secret, Error> {
-    let rsa = jwk_str_to_rsa_key_params(key)?;
-    let sign = jws::Secret::RsaKeyPair(Arc::new(RsaKeyPair::from_der(untrusted::Input::from(
-        &to_der(rsa)?,
-    ))?));
+    let rsa = jwk_str_to_rsa_key_params(key).map_err(|_| KeyError::NoRsaJwk)?;
+    let sign = jws::Secret::RsaKeyPair(Arc::new(
+        RsaKeyPair::from_der(&to_der(rsa).map_err(|_| KeyError::NoRsaJwk)?)
+            .map_err(|_| KeyError::NoRsaJwk)?,
+    ));
     Ok(sign)
 }
 

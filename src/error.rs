@@ -18,6 +18,8 @@ pub enum RsaKeyError {
 pub enum KeyError {
     #[fail(display = "no rsa jwk")]
     NoRsaJwk,
+    #[fail(display = "no rsa pem")]
+    NoRsaPem,
 }
 
 #[derive(Debug, Fail)]

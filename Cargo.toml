@@ -1,6 +1,6 @@
 [package]
 name = "cis_profile"
-version = "0.1.4"
+version = "0.2.0"
 authors = ["Florian Merz <flomerz@gmail.com>"]
 edition = "2018"
 license = "MIT"
@@ -19,11 +19,10 @@ well_known = ["reqwest"]
 vendored = ["openssl/vendored"]
 
 [dependencies]
-biscuit = "0.2"
-ring = "0.14"
+biscuit = "0.4"
+ring = "0.16"
 openssl = "0.10"
 num-bigint = "0.2"
-untrusted = "0.6"
 serde = "1.0.80"
 serde_derive = "1.0.80"
 serde_json = { version = "1.0.32", features = ["preserve_order"] }
@@ -33,6 +32,6 @@ failure = "0.1"
 failure_derive = "0.1"
 
 juniper = { version = "0.14", optional = true }
-rusoto_core = { version = "0.41", optional = true }
-rusoto_ssm = { version = "0.41", optional = true }
+rusoto_core = { version = "0.42", optional = true }
+rusoto_ssm = { version = "0.42", optional = true }
 reqwest = { version = "0.9", optional = true }

@@ -161,8 +161,7 @@ mod test_make {
     fn test_make_profile() -> Result<(), Error> {
         if let Some(store) = get_store() {
             let mut profile: Profile =
-                serde_json::from_str(include_str!("../data/user_profile_null_create.json"))
-                    .unwrap();
+                serde_json::from_str(include_str!("../data/user_profile_null.json")).unwrap();
             profile.primary_email.value = Some(String::from("hknall@mozilla.com"));
             profile.user_id.value = Some(String::from("ad|Mozilla-LDAP|hknall"));
             profile.primary_username.value = Some(String::from("hknall"));

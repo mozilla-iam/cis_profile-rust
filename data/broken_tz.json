@@ -1,0 +1,28 @@
+{
+  "primary_username": {
+    "signature": {
+      "publisher": {
+        "alg": "RS256",
+        "typ": "JWS",
+        "name": "access_provider",
+        "value": ""
+      },
+      "additional": [
+        {
+          "alg": "RS256",
+          "typ": "JWS",
+          "name": null,
+          "value": ""
+        }
+      ]
+    },
+    "metadata": {
+      "classification": "PUBLIC",
+      "last_modified": "1970-01-01T:00:00:00+0100",
+      "created": "1970-01-01T:00:00:00Z",
+      "verified" : true,
+      "display": "public"
+    },
+    "value": "fiji"
+  }
+}

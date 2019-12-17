@@ -5,8 +5,10 @@ use chrono::SecondsFormat;
 use chrono::Utc;
 use failure::Error;
 use lazy_static::lazy_static;
+use serde::Deserializer;
 use serde::Serializer;
-use serde_derive::{Deserialize, Serialize};
+use serde_derive::Deserialize;
+use serde_derive::Serialize;
 use serde_json;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
@@ -25,6 +27,22 @@ where
     S: Serializer,
 {
     serializer.serialize_str(&date.to_rfc3339_opts(SecondsFormat::Millis, true))
+}
+
+pub fn deserialize_datetime<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use serde::Deserialize;
+    let s = String::deserialize(deserializer)?;
+    DateTime::parse_from_rfc3339(&s)
+        .map(Into::into)
+        .or_else(|_| {
+            NaiveDateTime::parse_from_str(&s, "%Y-%m-%dT:%H:%M:%S%.fZ")
+                .map(|d| DateTime::from_utc(d, Utc))
+        })
+        .or_else(|_| DateTime::parse_from_str(&s, "%Y-%m-%dT:%H:%M:%S%.f%z").map(Into::into))
+        .map_err(serde::de::Error::custom)
 }
 
 /// Trait implement by field types. Exposes the publisher of a field for signing and verifying.
@@ -152,9 +170,11 @@ impl TryFrom<&str> for Display {
 pub struct Metadata {
     pub classification: Classification,
     #[serde(serialize_with = "serialize_datetime")]
+    #[serde(deserialize_with = "deserialize_datetime")]
     pub created: DateTime<Utc>,
     pub display: Option<Display>,
     #[serde(serialize_with = "serialize_datetime")]
+    #[serde(deserialize_with = "deserialize_datetime")]
     pub last_modified: DateTime<Utc>,
     pub verified: bool,
 }
@@ -713,7 +733,6 @@ mod test {
         let mut scope = json_schema::Scope::new();
         let schema = scope.compile_and_return(schema, false)?;
         let valid = schema.validate(&serde_json::to_value(&profile)?);
-        println!("{:#?}", valid);
         assert!(valid.is_valid());
         Ok(())
     }
@@ -721,6 +740,13 @@ mod test {
     #[test]
     fn test_fake_profile() {
         let p = include_str!("../data/user_profile_null.json");
+        let profile: Result<Profile, _> = serde_json::from_str(p);
+        assert!(profile.is_ok());
+    }
+
+    #[test]
+    fn test_broken_tz() {
+        let p = include_str!("../data/broken_tz.json");
         let profile: Result<Profile, _> = serde_json::from_str(p);
         assert!(profile.is_ok());
     }

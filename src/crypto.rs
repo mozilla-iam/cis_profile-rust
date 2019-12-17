@@ -4,7 +4,6 @@ use biscuit::jws;
 use biscuit::jws::Secret;
 use biscuit::Empty;
 use failure::Error;
-use serde::Serialize;
 use serde_json::Value;
 use std::collections::HashMap;
 
@@ -22,22 +21,28 @@ use rusoto_ssm::{GetParameterRequest, Ssm, SsmClient};
 #[cfg(feature = "well_known")]
 use crate::error::WellKnownError;
 
+/// Trait implemented by types that can sign fields.
 pub trait Signer {
-    fn sign_attribute<T>(&self, attr: &mut T) -> Result<(), Error>
-    where
-        T: Serialize + Sign + Clone;
+    /// Sign a field implementing the `WithPublihser` trait.
+    fn sign_attribute(&self, attr: &mut impl WithPublisher) -> Result<(), Error>;
 }
 
+/// Trait implemented by types that can verify fields.
 pub trait Verifier {
-    fn verify_attribute(&self, attr: &impl Serialize) -> Result<bool, Error>;
+    // Verify a field implementing the `WithPublisher` trait.
+    fn verify_attribute(&self, attr: &impl WithPublisher) -> Result<bool, Error>;
 }
 
+/// Stores secrets to sign and verify.
 pub struct SecretStore {
+    /// A Map _Name_ → `Secret` used for signing.
     pub sign_secrets: HashMap<String, Secret>,
+    /// A Map _Name_ → `Secret` used for verifying.
     pub verify_secrets: HashMap<String, Secret>,
 }
 
 impl Default for SecretStore {
+    /// An empty store.
     fn default() -> Self {
         SecretStore {
             sign_secrets: HashMap::default(),
@@ -47,28 +52,19 @@ impl Default for SecretStore {
 }
 
 impl Signer for SecretStore {
-    fn sign_attribute<T>(&self, attr: &mut T) -> Result<(), Error>
-    where
-        T: Serialize + Sign + Clone,
-    {
-        let mut attr_c = if let Value::Object(m) = serde_json::to_value(attr.clone())? {
-            m
-        } else {
-            return Err(SignerVerifierError::NonObjectAttribute)?;
-        };
-        if let Some(Value::Null) = attr_c.get("value").or_else(|| attr_c.get("values")) {
+    /// Signs an attribute field.
+    /// Returns `Ok` if field is empty.
+    /// Retruns `Err` if publisher has no signing key in the store.
+    fn sign_attribute(&self, attr: &mut impl WithPublisher) -> Result<(), Error> {
+        if attr.is_empty() {
             return Ok(());
         }
-        let publisher = attr_c["signature"]["publisher"]["name"]
-            .clone()
-            .as_str()
-            .map(|s| s.to_owned())
-            .ok_or_else(|| SignerVerifierError::NoPublisher)?;
+        let publisher = attr.get_publisher().name.clone();
         let key = self
             .sign_secrets
-            .get(&publisher)
-            .ok_or_else(|| SignerVerifierError::NoPublisherKeys(publisher.clone()))?;
-        let _ = attr_c.remove("signature").unwrap_or_default();
+            .get(publisher.as_str())
+            .ok_or_else(|| SignerVerifierError::NoPublisherKeys(publisher.as_str().to_owned()))?;
+        let data = attr.data()?;
 
         let header: jws::Header<Empty> = jws::Header {
             registered: jws::RegisteredHeader {
@@ -80,14 +76,14 @@ impl Signer for SecretStore {
         };
         let claims = biscuit::ClaimsSet {
             registered: Default::default(),
-            private: Value::from(attr_c),
+            private: data,
         };
         let c = jws::Compact::new_decoded(header, claims);
         let c = c.encode(&key)?;
         let token = c.encoded()?.to_string();
-        attr.sign(Publisher {
+        attr.set_publisher(Publisher {
             alg: Alg::Rs256,
-            name: serde_json::from_str(&format!(r#""{}""#, publisher))?,
+            name: publisher,
             value: token,
             typ: Typ::Jws,
         });
@@ -96,31 +92,25 @@ impl Signer for SecretStore {
 }
 
 impl Verifier for SecretStore {
-    fn verify_attribute(&self, attr: &impl Serialize) -> Result<bool, Error> {
-        let mut attr_c: Value = serde_json::to_value(attr)?;
-        if attr_c.get("value").or_else(|| attr_c.get("values")) == Some(&Value::Null)
-            && attr_c["signature"]["publisher"]["value"] == ""
-        {
+    /// Verifies an attribute field.
+    /// Returns `Ok` if field is empty.
+    /// Retruns `Err` if publisher has no signing key in the store.
+    fn verify_attribute(&self, attr: &impl WithPublisher) -> Result<bool, Error> {
+        if attr.is_empty() {
             return Ok(true);
         }
-        let publisher = attr_c["signature"]["publisher"]["name"]
-            .as_str()
-            .ok_or_else(|| SignerVerifierError::NoPublisher)?;
+        let publisher = attr.get_publisher().name.as_str().to_owned();
         let key = self
             .verify_secrets
-            .get(publisher)
+            .get(&publisher)
             .ok_or_else(|| SignerVerifierError::NoPublisherKeys(publisher.to_owned()))?;
-        let token = attr_c["signature"]["publisher"]["value"]
-            .take()
-            .as_str()
-            .map(String::from)
-            .unwrap();
-        attr_c.as_object_mut().unwrap().remove("signature");
+        let token = attr.get_publisher().value.clone();
+        let data = attr.data()?;
         let c: jws::Compact<biscuit::ClaimsSet<Value>, Empty> = jws::Compact::new_encoded(&token);
         match c.decode(&key, jwa::SignatureAlgorithm::RS256) {
             Ok(c) => {
                 let from_token = &c.payload()?.private;
-                Ok(from_token == &attr_c)
+                Ok(from_token == &data)
             }
             Err(ValidationError(_)) => Ok(false),
             Err(e) => Err(e.into()),
@@ -129,6 +119,7 @@ impl Verifier for SecretStore {
 }
 
 impl SecretStore {
+    /// Loads singing keys from a `(Name, Key)` iterator.
     pub fn with_sign_keys_from_inline_iter<I>(mut self, sign_keys: I) -> Result<Self, Error>
     where
         I: IntoIterator<Item = (String, String)>,
@@ -141,6 +132,7 @@ impl SecretStore {
         Ok(self)
     }
 
+    /// Loads verifying keys from a `(Name, Key)` iterator.
     pub fn with_verify_keys_from_inline_iter<I>(mut self, sign_keys: I) -> Result<Self, Error>
     where
         I: IntoIterator<Item = (String, String)>,
@@ -154,6 +146,7 @@ impl SecretStore {
     }
 
     #[cfg(feature = "aws")]
+    /// Loads singing keys from a `(Name, SSM_PATH)` iterator.
     pub fn with_sign_keys_from_ssm_iter<I>(mut self, keys: I) -> Result<Self, Error>
     where
         I: IntoIterator<Item = (String, String)>,
@@ -170,6 +163,7 @@ impl SecretStore {
     }
 
     #[cfg(feature = "aws")]
+    /// Loads verifying keys from a `(Name, SSM_PATH)` iterator.
     pub fn with_verify_keys_from_ssm_iter<I>(mut self, keys: I) -> Result<Self, Error>
     where
         I: IntoIterator<Item = (String, String)>,
@@ -202,7 +196,7 @@ impl SecretStore {
                 ssm_client
                     .get_parameter(req)
                     .sync()
-                    .map_err(|e| SsmError::GetParamterFailed(e).into())
+                    .map_err(Into::into)
                     .and_then(|p| p.parameter.ok_or_else(|| SsmError::NoParameter.into()))
                     .and_then(|p| p.value.ok_or_else(|| SsmError::NoValue.into()))
                     .map(|key| (publisher, key))
@@ -210,6 +204,7 @@ impl SecretStore {
     }
 
     #[cfg(feature = "well_known")]
+    /// Loads verifying keys from a remote http jwks source.
     pub fn with_verify_keys_from_well_known(mut self, url: &str) -> Result<Self, Error> {
         let mut res = reqwest::get(url)?;
         let mut json: Value = res.json()?;
@@ -227,7 +222,7 @@ impl SecretStore {
             self.verify_secrets.extend(verify_secrets?);
             Ok(self)
         } else {
-            Err(WellKnownError::RetrieveVerifyKeysFailed)?
+            Err(WellKnownError::RetrieveVerifyKeysFailed.into())
         }
     }
 }
@@ -253,7 +248,8 @@ mod test {
     fn test_verify_attribute() -> Result<(), Error> {
         let store = get_fake_store();
 
-        let attr: Value = serde_json::from_str(include_str!("../data/attribute.json")).unwrap();
+        let attr: StandardAttributeString =
+            serde_json::from_str(include_str!("../data/attribute.json")).unwrap();
         let valid = store.verify_attribute(&attr)?;
         assert!(valid);
         Ok(())
@@ -263,8 +259,9 @@ mod test {
     fn test_verify_attribute_non_matching_claims() -> Result<(), Error> {
         let store = get_fake_store();
 
-        let mut attr: Value = serde_json::from_str(include_str!("../data/attribute.json")).unwrap();
-        attr["value"] = Value::from("break it!");
+        let mut attr: StandardAttributeString =
+            serde_json::from_str(include_str!("../data/attribute.json")).unwrap();
+        attr.value = Some(String::from("break it!"));
         let valid = store.verify_attribute(&attr)?;
         assert!(!valid);
         Ok(())
@@ -274,7 +271,7 @@ mod test {
     fn test_verify_attribute_invaild() -> Result<(), Error> {
         let store = get_fake_store();
 
-        let attr: Value =
+        let attr: StandardAttributeString =
             serde_json::from_str(include_str!("../data/attribute_invalid.json")).unwrap();
         let valid = store.verify_attribute(&attr)?;
         assert!(!valid);
@@ -456,5 +453,4 @@ mod well_known_test {
             .with_verify_keys_from_well_known("https://auth.allizom.org/.well-known/mozilla-iam")
             .is_ok());
     }
-
 }

@@ -1,6 +1,3 @@
-#[cfg(feature = "aws")]
-use rusoto_ssm::GetParameterError;
-
 #[derive(Debug, Fail)]
 pub enum RsaKeyError {
     #[fail(display = "no d")]
@@ -21,6 +18,8 @@ pub enum RsaKeyError {
 pub enum KeyError {
     #[fail(display = "no rsa jwk")]
     NoRsaJwk,
+    #[fail(display = "no rsa pem")]
+    NoRsaPem,
 }
 
 #[derive(Debug, Fail)]
@@ -36,8 +35,6 @@ pub enum SignerVerifierError {
 #[cfg(feature = "aws")]
 #[derive(Debug, Fail)]
 pub enum SsmError {
-    #[fail(display = "{}", _0)]
-    GetParamterFailed(GetParameterError),
     #[fail(display = "no parameter")]
     NoParameter,
     #[fail(display = "no value")]

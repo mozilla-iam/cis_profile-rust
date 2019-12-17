@@ -5,6 +5,7 @@ use crate::schema::Profile;
 use crate::schema::StaffInformationValuesArray;
 use failure::Error;
 
+/// Sign all fields of a profile with the given `Signer`.
 pub fn sign_full_profile(profile: &mut Profile, store: &impl Signer) -> Result<(), Error> {
     store.sign_attribute(&mut profile.active)?;
     store.sign_attribute(&mut profile.alternative_name)?;
@@ -65,6 +66,9 @@ fn sign_identities(
     store.sign_attribute(&mut attr.google_primary_email)?;
     store.sign_attribute(&mut attr.firefox_accounts_id)?;
     store.sign_attribute(&mut attr.firefox_accounts_primary_email)?;
+    store.sign_attribute(&mut attr.custom_1_primary_email)?;
+    store.sign_attribute(&mut attr.custom_2_primary_email)?;
+    store.sign_attribute(&mut attr.custom_3_primary_email)?;
     Ok(())
 }
 

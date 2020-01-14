@@ -1,13 +1,49 @@
 use crate::error::SignerVerifierError;
+use chrono::DateTime;
+use chrono::NaiveDateTime;
+use chrono::SecondsFormat;
+use chrono::Utc;
 use failure::Error;
-#[cfg(feature = "graphql")]
-use juniper::{GraphQLEnum, GraphQLObject, ParseScalarValue, Value};
-use serde_derive::{Deserialize, Serialize};
+use lazy_static::lazy_static;
+use serde::Deserializer;
+use serde::Serializer;
+use serde_derive::Deserialize;
+use serde_derive::Serialize;
 use serde_json;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
+
+#[cfg(feature = "graphql")]
+use juniper::{GraphQLEnum, GraphQLObject, ParseScalarValue, Value};
 #[cfg(feature = "graphql")]
 use std::iter::FromIterator;
+
+lazy_static! {
+    static ref ZERO: DateTime<Utc> =
+        DateTime::<Utc>::from_utc(NaiveDateTime::from_timestamp(0, 0), Utc);
+}
+pub fn serialize_datetime<S>(date: &DateTime<Utc>, serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    serializer.serialize_str(&date.to_rfc3339_opts(SecondsFormat::Millis, true))
+}
+
+pub fn deserialize_datetime<'de, D>(deserializer: D) -> Result<DateTime<Utc>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    use serde::Deserialize;
+    let s = String::deserialize(deserializer)?;
+    DateTime::parse_from_rfc3339(&s)
+        .map(Into::into)
+        .or_else(|_| {
+            NaiveDateTime::parse_from_str(&s, "%Y-%m-%dT:%H:%M:%S%.fZ")
+                .map(|d| DateTime::from_utc(d, Utc))
+        })
+        .or_else(|_| DateTime::parse_from_str(&s, "%Y-%m-%dT:%H:%M:%S%.f%z").map(Into::into))
+        .map_err(serde::de::Error::custom)
+}
 
 /// Trait implement by field types. Exposes the publisher of a field for signing and verifying.
 pub trait WithPublisher {
@@ -45,57 +81,13 @@ graphql_scalar!(KeyValue as "KeyValue" where Scalar = <S> {
     }
 });
 
-#[cfg_attr(feature = "graphql", derive(GraphQLObject))]
-#[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
-pub struct AccessInformationProviderSubObject {
-    pub metadata: Metadata,
-    pub signature: Signature,
-    pub values: Option<KeyValue>,
-}
-
-impl Default for AccessInformationProviderSubObject {
-    fn default() -> Self {
-        AccessInformationProviderSubObject::with(None, Classification::default())
-    }
-}
-
-impl AccessInformationProviderSubObject {
-    fn with(display: Option<Display>, classification: Classification) -> Self {
-        AccessInformationProviderSubObject {
-            metadata: Metadata::with(display, classification),
-            signature: Signature::default(),
-            values: None,
-        }
-    }
-}
-
-impl WithPublisher for AccessInformationProviderSubObject {
-    fn set_publisher(&mut self, publisher: Publisher) {
-        self.signature.publisher = publisher;
-    }
-    fn get_publisher(&self) -> &Publisher {
-        &self.signature.publisher
-    }
-    fn data(&self) -> Result<serde_json::Value, Error> {
-        let mut c = match serde_json::to_value(self) {
-            Ok(serde_json::Value::Object(o)) => o,
-            _ => return Err(SignerVerifierError::NonObjectAttribute.into()),
-        };
-        c.remove("signature");
-        Ok(serde_json::Value::from(c))
-    }
-    fn is_empty(&self) -> bool {
-        self.values.is_none()
-    }
-}
-
 #[cfg_attr(feature = "graphql", derive(GraphQLEnum))]
 #[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
 pub enum Alg {
-    #[serde(rename = "HS256")]
-    Hs256,
     #[serde(rename = "RS256")]
     Rs256,
+    #[serde(rename = "HS256")]
+    Hs256,
     #[serde(rename = "RSA")]
     Rsa,
     #[serde(rename = "ED25519")]
@@ -177,15 +169,19 @@ impl TryFrom<&str> for Display {
 #[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
 pub struct Metadata {
     pub classification: Classification,
-    pub created: String,
+    #[serde(serialize_with = "serialize_datetime")]
+    #[serde(deserialize_with = "deserialize_datetime")]
+    pub created: DateTime<Utc>,
     pub display: Option<Display>,
-    pub last_modified: String,
+    #[serde(serialize_with = "serialize_datetime")]
+    #[serde(deserialize_with = "deserialize_datetime")]
+    pub last_modified: DateTime<Utc>,
     pub verified: bool,
 }
 
 impl Default for Metadata {
     fn default() -> Self {
-        Metadata::with(Some(Display::Staff), Classification::default())
+        Metadata::with(None, Classification::default())
     }
 }
 
@@ -193,9 +189,9 @@ impl Metadata {
     fn with(display: Option<Display>, classification: Classification) -> Self {
         Metadata {
             classification,
-            created: String::default(),
+            created: *ZERO,
             display,
-            last_modified: String::default(),
+            last_modified: *ZERO,
             verified: false,
         }
     }
@@ -274,7 +270,7 @@ impl Default for Signature {
         Signature {
             additional: vec![],
             publisher: Publisher {
-                alg: Alg::Hs256,
+                alg: Alg::Rs256,
                 name: PublisherAuthority::Mozilliansorg,
                 typ: Typ::Jws,
                 value: String::default(),
@@ -409,6 +405,50 @@ pub enum Typ {
 
 #[cfg_attr(feature = "graphql", derive(GraphQLObject))]
 #[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
+pub struct AccessInformationProviderSubObject {
+    pub metadata: Metadata,
+    pub signature: Signature,
+    pub values: Option<KeyValue>,
+}
+
+impl Default for AccessInformationProviderSubObject {
+    fn default() -> Self {
+        AccessInformationProviderSubObject::with(None, Classification::default())
+    }
+}
+
+impl AccessInformationProviderSubObject {
+    fn with(display: Option<Display>, classification: Classification) -> Self {
+        AccessInformationProviderSubObject {
+            metadata: Metadata::with(display, classification),
+            signature: Signature::default(),
+            values: None,
+        }
+    }
+}
+
+impl WithPublisher for AccessInformationProviderSubObject {
+    fn set_publisher(&mut self, publisher: Publisher) {
+        self.signature.publisher = publisher;
+    }
+    fn get_publisher(&self) -> &Publisher {
+        &self.signature.publisher
+    }
+    fn data(&self) -> Result<serde_json::Value, Error> {
+        let mut c = match serde_json::to_value(self) {
+            Ok(serde_json::Value::Object(o)) => o,
+            _ => return Err(SignerVerifierError::NonObjectAttribute.into()),
+        };
+        c.remove("signature");
+        Ok(serde_json::Value::from(c))
+    }
+    fn is_empty(&self) -> bool {
+        self.values.is_none()
+    }
+}
+
+#[cfg_attr(feature = "graphql", derive(GraphQLObject))]
+#[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
 pub struct AccessInformationValuesArray {
     #[serde(default)]
     pub access_provider: AccessInformationProviderSubObject,
@@ -429,10 +469,7 @@ impl Default for AccessInformationValuesArray {
                 Classification::WorkgroupConfidentialStaffOnly,
             ),
             ldap: AccessInformationProviderSubObject::with(None, Classification::Public),
-            mozilliansorg: AccessInformationProviderSubObject::with(
-                Some(Display::Staff),
-                Classification::Public,
-            ),
+            mozilliansorg: AccessInformationProviderSubObject::with(None, Classification::Public),
         }
     }
 }
@@ -479,50 +516,29 @@ impl Default for IdentitiesAttributesValuesArray {
         IdentitiesAttributesValuesArray {
             github_id_v3: StandardAttributeString::default(),
             github_id_v4: StandardAttributeString::default(),
-            github_primary_email: StandardAttributeString::with(
-                Some(Display::Public),
-                Classification::default(),
-            ),
-            mozilliansorg_id: StandardAttributeString::with(
-                Some(Display::Staff),
-                Classification::default(),
-            ),
+            github_primary_email: StandardAttributeString::default(),
+            mozilliansorg_id: StandardAttributeString::default(),
             bugzilla_mozilla_org_id: StandardAttributeString::default(),
-            bugzilla_mozilla_org_primary_email: StandardAttributeString::with(
-                Some(Display::Public),
-                Classification::default(),
-            ),
+            bugzilla_mozilla_org_primary_email: StandardAttributeString::default(),
             mozilla_ldap_id: StandardAttributeString::with(
                 Some(Display::Staff),
                 Classification::default(),
             ),
             mozilla_ldap_primary_email: StandardAttributeString::with(
-                Some(Display::Public),
+                Some(Display::Staff),
                 Classification::default(),
             ),
-            mozilla_posix_id: StandardAttributeString::default(),
+            mozilla_posix_id: StandardAttributeString::with(
+                Some(Display::Staff),
+                Classification::default(),
+            ),
             google_oauth2_id: StandardAttributeString::default(),
-            google_primary_email: StandardAttributeString::with(
-                Some(Display::Public),
-                Classification::default(),
-            ),
+            google_primary_email: StandardAttributeString::default(),
             firefox_accounts_id: StandardAttributeString::default(),
-            firefox_accounts_primary_email: StandardAttributeString::with(
-                Some(Display::Public),
-                Classification::default(),
-            ),
-            custom_1_primary_email: StandardAttributeString::with(
-                Some(Display::Public),
-                Classification::default(),
-            ),
-            custom_2_primary_email: StandardAttributeString::with(
-                Some(Display::Public),
-                Classification::default(),
-            ),
-            custom_3_primary_email: StandardAttributeString::with(
-                Some(Display::Public),
-                Classification::default(),
-            ),
+            firefox_accounts_primary_email: StandardAttributeString::default(),
+            custom_1_primary_email: StandardAttributeString::default(),
+            custom_2_primary_email: StandardAttributeString::default(),
+            custom_3_primary_email: StandardAttributeString::default(),
         }
     }
 }
@@ -553,11 +569,29 @@ pub struct StaffInformationValuesArray {
 impl Default for StaffInformationValuesArray {
     fn default() -> Self {
         StaffInformationValuesArray {
-            manager: StandardAttributeBoolean::default(),
-            director: StandardAttributeBoolean::default(),
-            staff: StandardAttributeBoolean::default(),
-            title: StandardAttributeString::default(),
-            team: StandardAttributeString::default(),
+            manager: StandardAttributeBoolean::with(
+                None,
+                Some(Display::Ndaed),
+                Classification::MozillaConfidential,
+            ),
+            director: StandardAttributeBoolean::with(
+                None,
+                Some(Display::Ndaed),
+                Classification::MozillaConfidential,
+            ),
+            staff: StandardAttributeBoolean::with(
+                None,
+                Some(Display::Ndaed),
+                Classification::MozillaConfidential,
+            ),
+            title: StandardAttributeString::with(
+                Some(Display::Ndaed),
+                Classification::MozillaConfidential,
+            ),
+            team: StandardAttributeString::with(
+                Some(Display::Ndaed),
+                Classification::MozillaConfidential,
+            ),
             cost_center: StandardAttributeString::with(
                 Some(Display::Staff),
                 Classification::WorkgroupConfidentialStaffOnly,
@@ -566,8 +600,14 @@ impl Default for StaffInformationValuesArray {
                 Some(Display::Staff),
                 Classification::WorkgroupConfidentialStaffOnly,
             ),
-            wpr_desk_number: StandardAttributeString::default(),
-            office_location: StandardAttributeString::default(),
+            wpr_desk_number: StandardAttributeString::with(
+                Some(Display::Ndaed),
+                Classification::MozillaConfidential,
+            ),
+            office_location: StandardAttributeString::with(
+                Some(Display::Ndaed),
+                Classification::MozillaConfidential,
+            ),
         }
     }
 }
@@ -639,47 +679,32 @@ impl Default for Profile {
             access_information: AccessInformationValuesArray::default(),
             active: StandardAttributeBoolean::with(Some(true), None, Classification::default()),
             alternative_name: StandardAttributeString::default(),
-            created: StandardAttributeString::with(Some(Display::Private), Classification::Public),
+            created: StandardAttributeString::with(None, Classification::Public),
             description: StandardAttributeString::default(),
-            first_name: StandardAttributeString::with(Some(Display::Staff), Classification::Public),
+            first_name: StandardAttributeString::with(None, Classification::Public),
             fun_title: StandardAttributeString::default(),
             identities: IdentitiesAttributesValuesArray::default(),
             languages: StandardAttributeValues::default(),
-            last_modified: StandardAttributeString::with(
-                Some(Display::Staff),
-                Classification::Public,
-            ),
-            last_name: StandardAttributeString::with(Some(Display::Staff), Classification::Public),
+            last_modified: StandardAttributeString::with(None, Classification::Public),
+            last_name: StandardAttributeString::with(None, Classification::Public),
             location: StandardAttributeString::default(),
-            login_method: StandardAttributeString::with(
-                Some(Display::Staff),
-                Classification::Public,
-            ),
-            pgp_public_keys: StandardAttributeValues::with(
-                Some(Display::Staff),
-                Classification::Public,
-            ),
+            login_method: StandardAttributeString::with(None, Classification::Public),
+            pgp_public_keys: StandardAttributeValues::with(None, Classification::Public),
             phone_numbers: StandardAttributeValues::default(),
-            picture: StandardAttributeString::with(Some(Display::Staff), Classification::Public),
-            primary_email: StandardAttributeString::with(
-                Some(Display::Staff),
-                Classification::Public,
-            ),
+            picture: StandardAttributeString::with(None, Classification::Public),
+            primary_email: StandardAttributeString::with(None, Classification::Public),
             primary_username: StandardAttributeString::with(
                 Some(Display::Public),
                 Classification::Public,
             ),
             pronouns: StandardAttributeString::default(),
             schema: String::from("https://person-api.sso.mozilla.com/schema/v2/profile"),
-            ssh_public_keys: StandardAttributeValues::with(
-                Some(Display::Staff),
-                Classification::Public,
-            ),
+            ssh_public_keys: StandardAttributeValues::with(None, Classification::Public),
             staff_information: StaffInformationValuesArray::default(),
             tags: StandardAttributeValues::default(),
             timezone: StandardAttributeString::default(),
             uris: StandardAttributeValues::default(),
-            user_id: StandardAttributeString::with(Some(Display::Staff), Classification::Public),
+            user_id: StandardAttributeString::with(None, Classification::Public),
             usernames: StandardAttributeValues::with(
                 Some(Display::Public),
                 Classification::default(),
@@ -693,6 +718,8 @@ impl Default for Profile {
 mod test {
     use super::*;
     use failure::Error;
+    use serde_json::Value;
+    use valico::json_schema;
 
     #[test]
     fn basic_profile() {
@@ -700,8 +727,26 @@ mod test {
     }
 
     #[test]
+    fn default_profile_validates() -> Result<(), Error> {
+        let profile = Profile::default();
+        let schema: Value = serde_json::from_str(include_str!("../data/profile.schema"))?;
+        let mut scope = json_schema::Scope::new();
+        let schema = scope.compile_and_return(schema, false)?;
+        let valid = schema.validate(&serde_json::to_value(&profile)?);
+        assert!(valid.is_valid());
+        Ok(())
+    }
+
+    #[test]
     fn test_fake_profile() {
         let p = include_str!("../data/user_profile_null.json");
+        let profile: Result<Profile, _> = serde_json::from_str(p);
+        assert!(profile.is_ok());
+    }
+
+    #[test]
+    fn test_broken_tz() {
+        let p = include_str!("../data/broken_tz.json");
         let profile: Result<Profile, _> = serde_json::from_str(p);
         assert!(profile.is_ok());
     }

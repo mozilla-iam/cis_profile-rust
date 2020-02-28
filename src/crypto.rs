@@ -206,7 +206,7 @@ impl SecretStore {
     #[cfg(feature = "well_known")]
     /// Loads verifying keys from a remote http jwks source.
     pub fn with_verify_keys_from_well_known(mut self, url: &str) -> Result<Self, Error> {
-        let mut res = reqwest::get(url)?;
+        let res = reqwest::blocking::get(url)?;
         let mut json: Value = res.json()?;
         if let Value::Object(keys) = json["api"]["publishers_jwks"].take() {
             let verify_secrets: Result<HashMap<String, Secret>, Error> = keys

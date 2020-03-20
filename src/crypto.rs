@@ -1,3 +1,6 @@
+use crate::error::SignerVerifierError;
+use crate::keys::*;
+use crate::schema::*;
 use biscuit::errors::Error::ValidationError;
 use biscuit::jwa;
 use biscuit::jws;
@@ -7,12 +10,10 @@ use failure::Error;
 use serde_json::Value;
 use std::collections::HashMap;
 
-use crate::error::SignerVerifierError;
-use crate::keys::*;
-use crate::schema::*;
-
 #[cfg(feature = "aws")]
 use crate::error::SsmError;
+#[cfg(feature = "aws")]
+use futures::future::try_join_all;
 #[cfg(feature = "aws")]
 use rusoto_core::Region;
 #[cfg(feature = "aws")]
@@ -147,16 +148,15 @@ impl SecretStore {
 
     #[cfg(feature = "aws")]
     /// Loads singing keys from a `(Name, SSM_PATH)` iterator.
-    pub fn with_sign_keys_from_ssm_iter<I>(mut self, keys: I) -> Result<Self, Error>
+    pub async fn with_sign_keys_from_ssm_iter<I>(mut self, keys: I) -> Result<Self, Error>
     where
         I: IntoIterator<Item = (String, String)>,
     {
         let sign_secrets: Result<HashMap<String, Secret>, Error> =
             SecretStore::str_keys_from_ssm_iter(keys)
+                .await?
                 .into_iter()
-                .map(|x| {
-                    x.and_then(|(publisher, v)| sign_key_from_str(&v).map(|key| (publisher, key)))
-                })
+                .map(|(publisher, v)| sign_key_from_str(&v).map(|key| (publisher, key)))
                 .collect();
         self.sign_secrets.extend(sign_secrets?);
         Ok(self)
@@ -164,50 +164,58 @@ impl SecretStore {
 
     #[cfg(feature = "aws")]
     /// Loads verifying keys from a `(Name, SSM_PATH)` iterator.
-    pub fn with_verify_keys_from_ssm_iter<I>(mut self, keys: I) -> Result<Self, Error>
+    pub async fn with_verify_keys_from_ssm_iter<I>(mut self, keys: I) -> Result<Self, Error>
     where
         I: IntoIterator<Item = (String, String)>,
     {
         let verify_secrets: Result<HashMap<String, Secret>, Error> =
             SecretStore::str_keys_from_ssm_iter(keys)
+                .await?
                 .into_iter()
-                .map(|x| {
-                    x.and_then(|(publisher, v)| verify_key_from_str(&v).map(|key| (publisher, key)))
-                })
+                .map(|(publisher, v)| verify_key_from_str(&v).map(|key| (publisher, key)))
                 .collect();
         self.verify_secrets.extend(verify_secrets?);
         Ok(self)
     }
 
     #[cfg(feature = "aws")]
-    fn str_keys_from_ssm_iter<I>(
-        keys: I,
-    ) -> impl IntoIterator<Item = Result<(String, String), Error>>
+    async fn str_keys_from_ssm_iter<I>(keys: I) -> Result<Vec<(String, String)>, Error>
     where
         I: IntoIterator<Item = (String, String)>,
     {
-        let ssm_client = SsmClient::new(Region::default());
-        keys.into_iter()
-            .map(move |(publisher, ssm_parameter_name)| {
-                let req = GetParameterRequest {
-                    name: ssm_parameter_name,
-                    with_decryption: Some(true),
-                };
-                ssm_client
-                    .get_parameter(req)
-                    .sync()
-                    .map_err(Into::into)
-                    .and_then(|p| p.parameter.ok_or_else(|| SsmError::NoParameter.into()))
-                    .and_then(|p| p.value.ok_or_else(|| SsmError::NoValue.into()))
-                    .map(|key| (publisher, key))
-            })
+        try_join_all(
+            keys.into_iter()
+                .map(move |(publisher, ssm_parameter_name)| async move {
+                    let ssm_client = SsmClient::new(Region::default());
+                    let req = GetParameterRequest {
+                        name: ssm_parameter_name,
+                        with_decryption: Some(true),
+                    };
+                    ssm_client
+                        .get_parameter(req)
+                        .await
+                        .map_err(Into::into)
+                        .and_then(|res| {
+                            if let Some(p) = res.parameter {
+                                if let Some(key) = p.value {
+                                    Ok((publisher, key))
+                                } else {
+                                    Err(SsmError::NoValue.into())
+                                }
+                            } else {
+                                Err(SsmError::NoParameter.into())
+                            }
+                        })
+                }),
+        )
+        .await
     }
 
     #[cfg(feature = "well_known")]
     /// Loads verifying keys from a remote http jwks source.
-    pub fn with_verify_keys_from_well_known(mut self, url: &str) -> Result<Self, Error> {
-        let res = reqwest::blocking::get(url)?;
-        let mut json: Value = res.json()?;
+    pub async fn with_verify_keys_from_well_known(mut self, url: &str) -> Result<Self, Error> {
+        let res = reqwest::get(url).await?;
+        let mut json: Value = res.json().await?;
         if let Value::Object(keys) = json["api"]["publishers_jwks"].take() {
             let verify_secrets: Result<HashMap<String, Secret>, Error> = keys
                 .into_iter()
@@ -419,18 +427,20 @@ mod aws_test {
     use crate::schema::StandardAttributeString;
     use std::env;
 
-    #[test]
-    fn test_keys_from_ssm() -> Result<(), Error> {
+    #[tokio::test]
+    async fn test_keys_from_ssm() -> Result<(), Error> {
         if let Ok(mozillians_key_ssm_name) = env::var("CIS_SSM_MOZILLIANSORG_KEY") {
             let store = SecretStore::default()
                 .with_sign_keys_from_ssm_iter(vec![(
                     String::from("mozilliansorg"),
                     mozillians_key_ssm_name.clone(),
-                )])?
+                )])
+                .await?
                 .with_verify_keys_from_ssm_iter(vec![(
                     String::from("mozilliansorg"),
                     mozillians_key_ssm_name,
-                )])?;
+                )])
+                .await?;
             let mut attr: StandardAttributeString =
                 serde_json::from_str(include_str!("../data/attribute_invalid.json")).unwrap();
             store.sign_attribute(&mut attr)?;
@@ -446,11 +456,12 @@ mod aws_test {
 mod well_known_test {
     use super::*;
 
-    #[test]
-    fn test_keys_from_well_knwon() {
+    #[tokio::test]
+    async fn test_keys_from_well_knwon() {
         // check for ok once we fix x5c in the well-known
         assert!(SecretStore::default()
             .with_verify_keys_from_well_known("https://auth.allizom.org/.well-known/mozilla-iam")
+            .await
             .is_ok());
     }
 }

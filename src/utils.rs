@@ -124,7 +124,7 @@ mod test_make {
 
     use std::env;
 
-    fn get_store() -> Option<SecretStore> {
+    async fn get_store() -> Option<SecretStore> {
         if let (
             Ok(mozillians_key_ssm_name),
             Ok(hris_key_ssm_name),
@@ -150,6 +150,7 @@ mod test_make {
                             access_provider_key_ssm_name,
                         ),
                     ])
+                    .await
                     .unwrap(),
             )
         } else {
@@ -157,9 +158,9 @@ mod test_make {
         }
     }
 
-    #[test]
-    fn test_make_profile() -> Result<(), Error> {
-        if let Some(store) = get_store() {
+    #[tokio::test]
+    async fn test_make_profile() -> Result<(), Error> {
+        if let Some(store) = get_store().await {
             let mut profile: Profile =
                 serde_json::from_str(include_str!("../data/user_profile_null.json")).unwrap();
             profile.primary_email.value = Some(String::from("hknall@mozilla.com"));

@@ -19,6 +19,7 @@ well_known = ["reqwest"]
 vendored = ["openssl/vendored"]
 
 [dependencies]
+dino_park_trust = { git = "https://github.com/mozilla-iam/dino-park-trust", tag = "0.0.5", version = "0.0.5" }
 biscuit = "0.4"
 ring = "0.16"
 openssl = "0.10"

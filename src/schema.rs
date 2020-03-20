@@ -3,6 +3,7 @@ use chrono::DateTime;
 use chrono::NaiveDateTime;
 use chrono::SecondsFormat;
 use chrono::Utc;
+use dino_park_trust::Trust;
 use failure::Error;
 use lazy_static::lazy_static;
 use serde::Deserializer;
@@ -134,6 +135,18 @@ pub enum Display {
     Staff,
     #[serde(rename = "private")]
     Private,
+}
+
+impl From<Trust> for Display {
+    fn from(t: Trust) -> Self {
+        match t {
+            Trust::Staff => Self::Staff,
+            Trust::Ndaed => Self::Ndaed,
+            Trust::Vouched => Self::Vouched,
+            Trust::Authenticated => Self::Authenticated,
+            Trust::Public => Self::Public,
+        }
+    }
 }
 
 impl Display {
@@ -804,15 +817,24 @@ mod test {
     }
 
     #[test]
+    fn test_display_from_trust() {
+        assert_eq!(Display::from(Trust::Public), Display::Public);
+        assert_eq!(Display::from(Trust::Authenticated), Display::Authenticated);
+        assert_eq!(Display::from(Trust::Vouched), Display::Vouched);
+        assert_eq!(Display::from(Trust::Ndaed), Display::Ndaed);
+        assert_eq!(Display::from(Trust::Staff), Display::Staff);
+    }
+
+    #[test]
     fn test_display_order() {
-        assert_eq!(Display::Private > Display::Staff, true);
-        assert_eq!(Display::Staff >= Display::Staff, true);
-        assert_eq!(Display::Staff > Display::Ndaed, true);
-        assert_eq!(Display::Public < Display::Staff, true);
-        assert_eq!(Display::Public < Display::Ndaed, true);
-        assert_eq!(Display::Public < Display::Vouched, true);
-        assert_eq!(Display::Public < Display::Authenticated, true);
-        assert_eq!(Display::Public <= Display::Public, true);
+        assert!(Display::Private > Display::Staff);
+        assert!(Display::Staff >= Display::Staff);
+        assert!(Display::Staff > Display::Ndaed);
+        assert!(Display::Public < Display::Staff);
+        assert!(Display::Public < Display::Ndaed);
+        assert!(Display::Public < Display::Vouched);
+        assert!(Display::Public < Display::Authenticated);
+        assert!(Display::Public <= Display::Public);
     }
 
     #[test]

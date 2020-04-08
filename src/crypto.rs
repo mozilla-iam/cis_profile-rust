@@ -292,7 +292,7 @@ mod test {
 
         let mut attr: StandardAttributeString =
             serde_json::from_str(include_str!("../data/attribute_invalid.json")).unwrap();
-        let _ = store.sign_attribute(&mut attr)?;
+        store.sign_attribute(&mut attr)?;
         Ok(())
     }
 

@@ -826,6 +826,7 @@ mod test {
     }
 
     #[test]
+    #[allow(clippy::eq_op)]
     fn test_display_order() {
         assert!(Display::Private > Display::Staff);
         assert!(Display::Staff >= Display::Staff);

@@ -10,12 +10,13 @@ use serde::Deserializer;
 use serde::Serializer;
 use serde_derive::Deserialize;
 use serde_derive::Serialize;
-use serde_json;
+use serde_json::to_value;
+use serde_json::Value;
 use std::collections::BTreeMap;
 use std::convert::TryFrom;
 
 #[cfg(feature = "graphql")]
-use juniper::{GraphQLEnum, GraphQLObject, ParseScalarValue, Value};
+use juniper::{GraphQLEnum, GraphQLObject, ParseScalarValue};
 #[cfg(feature = "graphql")]
 use std::iter::FromIterator;
 
@@ -51,7 +52,7 @@ pub trait WithPublisher {
     /// Set the publisher.
     fn set_publisher(&mut self, publisher: Publisher);
     // Retrieve data as `Value`. For field typed this should return the payload to sign or verify.
-    fn data(&self) -> Result<serde_json::Value, Error>;
+    fn data(&self) -> Result<Value, Error>;
     // Retrieve the publisher.
     fn get_publisher(&self) -> &Publisher;
     // Check wether the field type shoud be considered empty.
@@ -64,11 +65,11 @@ pub struct KeyValue(pub BTreeMap<String, Option<String>>);
 
 #[cfg(feature = "graphql")]
 graphql_scalar!(KeyValue as "KeyValue" where Scalar = <S> {
-    resolve(&self) -> Value {
-        Value::Object(
+    resolve(&self) -> juniper::Value {
+        juniper::Value::Object(
             juniper::Object::from_iter(
                 self.0.iter()
-                    .map(|(k, v)| (k.clone(), Value::from(v.clone())))))
+                    .map(|(k, v)| (k.clone(), juniper::Value::from(v.clone())))))
     }
     from_input_value(v: &InputValue) -> Option<KeyValue> {
         v.to_object_value().map(|o| {
@@ -317,13 +318,13 @@ impl WithPublisher for StandardAttributeBoolean {
     fn get_publisher(&self) -> &Publisher {
         &self.signature.publisher
     }
-    fn data(&self) -> Result<serde_json::Value, Error> {
-        let mut c = match serde_json::to_value(self) {
-            Ok(serde_json::Value::Object(o)) => o,
+    fn data(&self) -> Result<Value, Error> {
+        let mut c = match to_value(self) {
+            Ok(Value::Object(o)) => o,
             _ => return Err(SignerVerifierError::NonObjectAttribute.into()),
         };
         c.remove("signature");
-        Ok(serde_json::Value::from(c))
+        Ok(Value::from(c))
     }
     fn is_empty(&self) -> bool {
         self.value.is_none()
@@ -356,13 +357,13 @@ impl WithPublisher for StandardAttributeString {
     fn get_publisher(&self) -> &Publisher {
         &self.signature.publisher
     }
-    fn data(&self) -> Result<serde_json::Value, Error> {
+    fn data(&self) -> Result<Value, Error> {
         let mut c = match serde_json::to_value(self) {
-            Ok(serde_json::Value::Object(o)) => o,
+            Ok(Value::Object(o)) => o,
             _ => return Err(SignerVerifierError::NonObjectAttribute.into()),
         };
         c.remove("signature");
-        Ok(serde_json::Value::from(c))
+        Ok(Value::from(c))
     }
     fn is_empty(&self) -> bool {
         self.value.is_none()
@@ -394,13 +395,13 @@ impl WithPublisher for StandardAttributeValues {
     fn get_publisher(&self) -> &Publisher {
         &self.signature.publisher
     }
-    fn data(&self) -> Result<serde_json::Value, Error> {
-        let mut c = match serde_json::to_value(self) {
-            Ok(serde_json::Value::Object(o)) => o,
+    fn data(&self) -> Result<Value, Error> {
+        let mut c = match to_value(self) {
+            Ok(Value::Object(o)) => o,
             _ => return Err(SignerVerifierError::NonObjectAttribute.into()),
         };
         c.remove("signature");
-        Ok(serde_json::Value::from(c))
+        Ok(Value::from(c))
     }
     fn is_empty(&self) -> bool {
         self.values.is_none()
@@ -447,13 +448,13 @@ impl WithPublisher for AccessInformationProviderSubObject {
     fn get_publisher(&self) -> &Publisher {
         &self.signature.publisher
     }
-    fn data(&self) -> Result<serde_json::Value, Error> {
-        let mut c = match serde_json::to_value(self) {
-            Ok(serde_json::Value::Object(o)) => o,
+    fn data(&self) -> Result<Value, Error> {
+        let mut c = match to_value(self) {
+            Ok(Value::Object(o)) => o,
             _ => return Err(SignerVerifierError::NonObjectAttribute.into()),
         };
         c.remove("signature");
-        Ok(serde_json::Value::from(c))
+        Ok(Value::from(c))
     }
     fn is_empty(&self) -> bool {
         self.values.is_none()
@@ -731,7 +732,6 @@ impl Default for Profile {
 mod test {
     use super::*;
     use failure::Error;
-    use serde_json::Value;
     use valico::json_schema;
 
     #[test]
@@ -745,7 +745,7 @@ mod test {
         let schema: Value = serde_json::from_str(include_str!("../data/profile.schema"))?;
         let mut scope = json_schema::Scope::new();
         let schema = scope.compile_and_return(schema, false)?;
-        let valid = schema.validate(&serde_json::to_value(&profile)?);
+        let valid = schema.validate(&to_value(&profile)?);
         assert!(valid.is_valid());
         Ok(())
     }

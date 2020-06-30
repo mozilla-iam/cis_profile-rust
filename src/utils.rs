@@ -1,4 +1,5 @@
 use crate::crypto::Signer;
+use crate::crypto::Verifier;
 use crate::schema::AccessInformationValuesArray;
 use crate::schema::IdentitiesAttributesValuesArray;
 use crate::schema::Profile;
@@ -6,6 +7,88 @@ use crate::schema::StaffInformationValuesArray;
 use failure::Error;
 
 /// Sign all fields of a profile with the given `Signer`.
+pub fn verify_full_profile(profile: &Profile, store: &impl Verifier) -> Result<(), Error> {
+    store.verify_attribute(&profile.active)?;
+    store.verify_attribute(&profile.alternative_name)?;
+    store.verify_attribute(&profile.created)?;
+    store.verify_attribute(&profile.description)?;
+    store.verify_attribute(&profile.first_name)?;
+    store.verify_attribute(&profile.fun_title)?;
+    store.verify_attribute(&profile.languages)?;
+    store.verify_attribute(&profile.last_modified)?;
+    store.verify_attribute(&profile.last_name)?;
+    store.verify_attribute(&profile.location)?;
+    store.verify_attribute(&profile.login_method)?;
+    store.verify_attribute(&profile.pgp_public_keys)?;
+    store.verify_attribute(&profile.phone_numbers)?;
+    store.verify_attribute(&profile.picture)?;
+    store.verify_attribute(&profile.primary_email)?;
+    store.verify_attribute(&profile.primary_username)?;
+    store.verify_attribute(&profile.pronouns)?;
+    store.verify_attribute(&profile.ssh_public_keys)?;
+    store.verify_attribute(&profile.tags)?;
+    store.verify_attribute(&profile.timezone)?;
+    store.verify_attribute(&profile.uris)?;
+    store.verify_attribute(&profile.user_id)?;
+    store.verify_attribute(&profile.usernames)?;
+    store.verify_attribute(&profile.uuid)?;
+
+    verify_accessinformation(&profile.access_information, store)?;
+    verify_identities(&profile.identities, store)?;
+    verify_staff_information(&profile.staff_information, store)?;
+    Ok(())
+}
+
+fn verify_accessinformation(
+    attr: &AccessInformationValuesArray,
+    store: &impl Verifier,
+) -> Result<(), Error> {
+    store.verify_attribute(&attr.access_provider)?;
+    store.verify_attribute(&attr.hris)?;
+    store.verify_attribute(&attr.ldap)?;
+    store.verify_attribute(&attr.mozilliansorg)?;
+    Ok(())
+}
+
+fn verify_identities(
+    attr: &IdentitiesAttributesValuesArray,
+    store: &impl Verifier,
+) -> Result<(), Error> {
+    store.verify_attribute(&attr.github_id_v3)?;
+    store.verify_attribute(&attr.github_id_v4)?;
+    store.verify_attribute(&attr.github_primary_email)?;
+    store.verify_attribute(&attr.mozilliansorg_id)?;
+    store.verify_attribute(&attr.bugzilla_mozilla_org_id)?;
+    store.verify_attribute(&attr.bugzilla_mozilla_org_primary_email)?;
+    store.verify_attribute(&attr.mozilla_ldap_id)?;
+    store.verify_attribute(&attr.mozilla_ldap_primary_email)?;
+    store.verify_attribute(&attr.mozilla_posix_id)?;
+    store.verify_attribute(&attr.google_oauth2_id)?;
+    store.verify_attribute(&attr.google_primary_email)?;
+    store.verify_attribute(&attr.firefox_accounts_id)?;
+    store.verify_attribute(&attr.firefox_accounts_primary_email)?;
+    store.verify_attribute(&attr.custom_1_primary_email)?;
+    store.verify_attribute(&attr.custom_2_primary_email)?;
+    store.verify_attribute(&attr.custom_3_primary_email)?;
+    Ok(())
+}
+
+fn verify_staff_information(
+    attr: &StaffInformationValuesArray,
+    store: &impl Verifier,
+) -> Result<(), Error> {
+    store.verify_attribute(&attr.manager)?;
+    store.verify_attribute(&attr.director)?;
+    store.verify_attribute(&attr.staff)?;
+    store.verify_attribute(&attr.title)?;
+    store.verify_attribute(&attr.team)?;
+    store.verify_attribute(&attr.cost_center)?;
+    store.verify_attribute(&attr.worker_type)?;
+    store.verify_attribute(&attr.wpr_desk_number)?;
+    store.verify_attribute(&attr.office_location)?;
+    Ok(())
+}
+
 pub fn sign_full_profile(profile: &mut Profile, store: &impl Signer) -> Result<(), Error> {
     store.sign_attribute(&mut profile.active)?;
     store.sign_attribute(&mut profile.alternative_name)?;
@@ -168,6 +251,7 @@ mod test_make {
             profile.primary_username.value = Some(String::from("hknall"));
             profile.uuid.value = Some(String::from("746dad92-3f94-4eed-9e25-7bc20e0041ec"));
             sign_full_profile(&mut profile, &store)?;
+            sign_full_profile(&profile, &store)?;
         }
         Ok(())
     }

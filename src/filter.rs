@@ -3,7 +3,7 @@ use crate::schema::*;
 macro_rules! impl_with_display {
     ($t:ident) => {
         impl WithDisplay for $t {
-            fn display(self: &Self) -> &Option<Display> {
+            fn display(&self) -> &Option<Display> {
                 &self.metadata.display
             }
         }
@@ -11,11 +11,11 @@ macro_rules! impl_with_display {
 }
 
 pub trait WithDisplay {
-    fn display(self: &Self) -> &Option<Display>;
+    fn display(&self) -> &Option<Display>;
 }
 
 pub trait Filtered {
-    fn filtered(self: &Self, default: Self, display: &Display) -> Self;
+    fn filtered(&self, default: Self, display: &Display) -> Self;
 }
 
 impl_with_display!(StandardAttributeString);
@@ -24,7 +24,7 @@ impl_with_display!(StandardAttributeValues);
 impl_with_display!(AccessInformationProviderSubObject);
 
 impl<T: WithDisplay + Default + Clone> Filtered for T {
-    fn filtered(self: &Self, default: Self, display: &Display) -> Self {
+    fn filtered(&self, default: Self, display: &Display) -> Self {
         match self.display() {
             None => default,
             Some(ref d) if d > display => default,
@@ -34,7 +34,7 @@ impl<T: WithDisplay + Default + Clone> Filtered for T {
 }
 
 impl Filtered for AccessInformationValuesArray {
-    fn filtered(self: &Self, default: Self, display: &Display) -> Self {
+    fn filtered(&self, default: Self, display: &Display) -> Self {
         AccessInformationValuesArray {
             access_provider: self
                 .access_provider
@@ -47,7 +47,7 @@ impl Filtered for AccessInformationValuesArray {
 }
 
 impl Filtered for StaffInformationValuesArray {
-    fn filtered(self: &Self, default: Self, display: &Display) -> Self {
+    fn filtered(&self, default: Self, display: &Display) -> Self {
         StaffInformationValuesArray {
             manager: self.manager.filtered(default.manager, display),
             director: self.director.filtered(default.director, display),
@@ -67,7 +67,7 @@ impl Filtered for StaffInformationValuesArray {
 }
 
 impl Filtered for IdentitiesAttributesValuesArray {
-    fn filtered(self: &Self, default: Self, display: &Display) -> Self {
+    fn filtered(&self, default: Self, display: &Display) -> Self {
         IdentitiesAttributesValuesArray {
             github_id_v3: self.github_id_v3.filtered(default.github_id_v3, display),
             github_id_v4: self.github_id_v4.filtered(default.github_id_v4, display),
@@ -118,7 +118,7 @@ impl Filtered for IdentitiesAttributesValuesArray {
 }
 
 impl Filtered for Profile {
-    fn filtered(self: &Self, default: Self, display: &Display) -> Self {
+    fn filtered(&self, default: Self, display: &Display) -> Self {
         Profile {
             access_information: self
                 .access_information
@@ -165,7 +165,7 @@ impl Filtered for Profile {
 }
 
 impl Profile {
-    pub fn filtered_default(self: &Self, display: &Display) -> Self {
+    pub fn filtered_default(&self, display: &Display) -> Self {
         self.filtered(Profile::default(), display)
     }
 }

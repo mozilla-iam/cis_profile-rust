@@ -251,7 +251,7 @@ mod test_make {
             profile.primary_username.value = Some(String::from("hknall"));
             profile.uuid.value = Some(String::from("746dad92-3f94-4eed-9e25-7bc20e0041ec"));
             sign_full_profile(&mut profile, &store)?;
-            sign_full_profile(&profile, &store)?;
+            verify_full_profile(&profile, &store)?;
         }
         Ok(())
     }

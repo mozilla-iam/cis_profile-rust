@@ -4,6 +4,7 @@ use chrono::NaiveDateTime;
 use chrono::SecondsFormat;
 use chrono::Utc;
 use dino_park_trust::Trust;
+use failure::format_err;
 use failure::Error;
 use lazy_static::lazy_static;
 use serde::Deserializer;
@@ -59,29 +60,36 @@ pub trait WithPublisher {
     fn is_empty(&self) -> bool;
 }
 
-/// We only suppet String → String dictionaries for now.
+/// We only support String → String dictionaries for now.
 #[derive(Default, Clone, PartialEq, Debug, Deserialize, Serialize)]
 pub struct KeyValue(pub BTreeMap<String, Option<String>>);
 
 #[cfg(feature = "graphql")]
-graphql_scalar!(KeyValue as "KeyValue" where Scalar = <S> {
-    resolve(&self) -> juniper::Value {
-        juniper::Value::Object(
-            juniper::Object::from_iter(
-                self.0.iter()
-                    .map(|(k, v)| (k.clone(), juniper::Value::from(v.clone())))))
+#[juniper::graphql_scalar(name = "KeyValue")]
+impl<S> GraphQLScalar for KeyValue
+where
+    S: juniper::ScalarValue,
+{
+    fn resolve(&self) -> juniper::Value {
+        juniper::Value::Object(juniper::Object::from_iter(
+            self.0
+                .iter()
+                .map(|(k, v)| (k.clone(), juniper::Value::from(v.clone()))),
+        ))
     }
-    from_input_value(v: &InputValue) -> Option<KeyValue> {
+    fn from_input_value(v: &InputValue) -> Option<KeyValue> {
         v.to_object_value().map(|o| {
-            KeyValue(BTreeMap::from_iter(o.iter().map(|(k, v)| {
-                (String::from(*k), v.as_scalar_value::<String>().cloned())
-            })))
+            KeyValue(
+                o.iter()
+                    .map(|(k, v)| (String::from(*k), v.as_string_value().map(ToOwned::to_owned)))
+                    .collect(),
+            )
         })
     }
-    from_str<'a>(value: ScalarToken<'a>) -> juniper::ParseScalarResult<'a, S> {
+    fn from_str<'a>(value: ScalarToken<'a>) -> juniper::ParseScalarResult<'a, S> {
         <String as ParseScalarValue<S>>::from_str(value)
     }
-});
+}
 
 #[cfg_attr(feature = "graphql", derive(GraphQLEnum))]
 #[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
@@ -725,6 +733,32 @@ impl Default for Profile {
             ),
             uuid: StandardAttributeString::with(Some(Display::Public), Classification::Public),
         }
+    }
+}
+
+#[cfg(feature = "graphql")]
+#[cfg(test)]
+mod graphql_test {
+    use super::*;
+    use juniper::parser::Spanning;
+    use juniper::FromInputValue;
+    use juniper::InputValue;
+
+    #[test]
+    fn key_val() {
+        let object = vec![
+            (
+                Spanning::unlocated("foo".to_owned()),
+                Spanning::unlocated(InputValue::scalar("foobar1".to_owned())),
+            ),
+            (
+                Spanning::unlocated("bar".to_owned()),
+                Spanning::unlocated(InputValue::scalar("foobar2".to_owned())),
+            ),
+        ];
+        let value: InputValue = InputValue::parsed_object(object);
+        let kv = KeyValue::from_input_value(&value).unwrap();
+        assert_eq!(kv.0.get("foo"), Some(&Some("foobar1".to_owned())));
     }
 }
 

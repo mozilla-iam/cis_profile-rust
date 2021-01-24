@@ -1,3 +1,4 @@
+use failure::Fail;
 #[derive(Debug, Fail)]
 pub enum RsaKeyError {
     #[fail(display = "no d")]

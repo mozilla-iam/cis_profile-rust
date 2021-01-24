@@ -84,12 +84,12 @@ fn verify_key_from_jwk(key: &str) -> Result<Secret, Error> {
 pub fn to_der(jwk_rsa: RSAKeyParameters) -> Result<Vec<u8>, Error> {
     let n = jwk_rsa.n;
     let e = jwk_rsa.e;
-    let d = jwk_rsa.d.ok_or_else(|| RsaKeyError::NoD)?;
-    let p = jwk_rsa.p.ok_or_else(|| RsaKeyError::NoP)?;
-    let q = jwk_rsa.q.ok_or_else(|| RsaKeyError::NoQ)?;
-    let dp = jwk_rsa.dp.ok_or_else(|| RsaKeyError::NoDP)?;
-    let dq = jwk_rsa.dq.ok_or_else(|| RsaKeyError::NoDQ)?;
-    let qinv = jwk_rsa.qi.ok_or_else(|| RsaKeyError::NoQI)?;
+    let d = jwk_rsa.d.ok_or(RsaKeyError::NoD)?;
+    let p = jwk_rsa.p.ok_or(RsaKeyError::NoP)?;
+    let q = jwk_rsa.q.ok_or(RsaKeyError::NoQ)?;
+    let dp = jwk_rsa.dp.ok_or(RsaKeyError::NoDP)?;
+    let dq = jwk_rsa.dq.ok_or(RsaKeyError::NoDQ)?;
+    let qinv = jwk_rsa.qi.ok_or(RsaKeyError::NoQI)?;
 
     let builder = RsaPrivateKeyBuilder::new(
         BigNum::from_slice(&n.to_bytes_be()).unwrap(),

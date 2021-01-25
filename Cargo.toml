@@ -35,9 +35,9 @@ lazy_static = "1.4"
 futures = "0.3"
 
 juniper = { version = "0.15", optional = true }
-rusoto_core = { version = "0.46", optional = true }
-rusoto_ssm = { version = "0.46", optional = true }
-reqwest = { version = "0.11", optional = true, features = ["blocking", "json"] }
+rusoto_core = { version = "0.45", optional = true }
+rusoto_ssm = { version = "0.45", optional = true }
+reqwest = { version = "0.11", optional = true, features = ["json"] }
 
 [dev-dependencies]
 valico = "3.1"

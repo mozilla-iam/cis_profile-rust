@@ -1,11 +1,11 @@
+use crate::error::KeyError;
+use crate::error::SchemaError;
 use crate::error::SignerVerifierError;
 use chrono::DateTime;
 use chrono::NaiveDateTime;
 use chrono::SecondsFormat;
 use chrono::Utc;
 use dino_park_trust::Trust;
-use failure::format_err;
-use failure::Error;
 use lazy_static::lazy_static;
 use serde::Deserializer;
 use serde::Serializer;
@@ -53,7 +53,7 @@ pub trait WithPublisher {
     /// Set the publisher.
     fn set_publisher(&mut self, publisher: Publisher);
     // Retrieve data as `Value`. For field typed this should return the payload to sign or verify.
-    fn data(&self) -> Result<Value, Error>;
+    fn data(&self) -> Result<Value, KeyError>;
     // Retrieve the publisher.
     fn get_publisher(&self) -> &Publisher;
     // Check wether the field type shoud be considered empty.
@@ -172,7 +172,7 @@ impl Display {
 }
 
 impl TryFrom<&str> for Display {
-    type Error = Error;
+    type Error = SchemaError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         Ok(match value.to_lowercase().as_str() {
@@ -182,7 +182,7 @@ impl TryFrom<&str> for Display {
             "ndaed" => Display::Ndaed,
             "staff" => Display::Staff,
             "private" => Display::Private,
-            _ => return Err(format_err!("invalid display value: {}", value)),
+            _ => return Err(SchemaError::InvalidDisplayLevelString),
         })
     }
 }
@@ -248,7 +248,7 @@ impl PublisherAuthority {
 }
 
 impl TryFrom<&str> for PublisherAuthority {
-    type Error = Error;
+    type Error = SchemaError;
 
     fn try_from(value: &str) -> Result<Self, Self::Error> {
         Ok(match value.to_lowercase().as_str() {
@@ -257,7 +257,7 @@ impl TryFrom<&str> for PublisherAuthority {
             "hris" => PublisherAuthority::Hris,
             "cis" => PublisherAuthority::Cis,
             "access_provider" => PublisherAuthority::AccessProvider,
-            _ => return Err(format_err!("invalid publisher value: {}", value)),
+            _ => return Err(SchemaError::InvalidPublisherString),
         })
     }
 }
@@ -326,7 +326,7 @@ impl WithPublisher for StandardAttributeBoolean {
     fn get_publisher(&self) -> &Publisher {
         &self.signature.publisher
     }
-    fn data(&self) -> Result<Value, Error> {
+    fn data(&self) -> Result<Value, KeyError> {
         let mut c = match to_value(self) {
             Ok(Value::Object(o)) => o,
             _ => return Err(SignerVerifierError::NonObjectAttribute.into()),
@@ -365,7 +365,7 @@ impl WithPublisher for StandardAttributeString {
     fn get_publisher(&self) -> &Publisher {
         &self.signature.publisher
     }
-    fn data(&self) -> Result<Value, Error> {
+    fn data(&self) -> Result<Value, KeyError> {
         let mut c = match serde_json::to_value(self) {
             Ok(Value::Object(o)) => o,
             _ => return Err(SignerVerifierError::NonObjectAttribute.into()),
@@ -403,7 +403,7 @@ impl WithPublisher for StandardAttributeValues {
     fn get_publisher(&self) -> &Publisher {
         &self.signature.publisher
     }
-    fn data(&self) -> Result<Value, Error> {
+    fn data(&self) -> Result<Value, KeyError> {
         let mut c = match to_value(self) {
             Ok(Value::Object(o)) => o,
             _ => return Err(SignerVerifierError::NonObjectAttribute.into()),
@@ -456,7 +456,7 @@ impl WithPublisher for AccessInformationProviderSubObject {
     fn get_publisher(&self) -> &Publisher {
         &self.signature.publisher
     }
-    fn data(&self) -> Result<Value, Error> {
+    fn data(&self) -> Result<Value, KeyError> {
         let mut c = match to_value(self) {
             Ok(Value::Object(o)) => o,
             _ => return Err(SignerVerifierError::NonObjectAttribute.into()),
@@ -765,7 +765,7 @@ mod graphql_test {
 #[cfg(test)]
 mod test {
     use super::*;
-    use failure::Error;
+    use anyhow::Error;
     use valico::json_schema;
 
     #[test]

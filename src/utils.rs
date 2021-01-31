@@ -1,13 +1,13 @@
 use crate::crypto::Signer;
 use crate::crypto::Verifier;
+use crate::error::KeyError;
 use crate::schema::AccessInformationValuesArray;
 use crate::schema::IdentitiesAttributesValuesArray;
 use crate::schema::Profile;
 use crate::schema::StaffInformationValuesArray;
-use failure::Error;
 
 /// Sign all fields of a profile with the given `Signer`.
-pub fn verify_full_profile(profile: &Profile, store: &impl Verifier) -> Result<(), Error> {
+pub fn verify_full_profile(profile: &Profile, store: &impl Verifier) -> Result<(), KeyError> {
     store.verify_attribute(&profile.active)?;
     store.verify_attribute(&profile.alternative_name)?;
     store.verify_attribute(&profile.created)?;
@@ -42,7 +42,7 @@ pub fn verify_full_profile(profile: &Profile, store: &impl Verifier) -> Result<(
 fn verify_accessinformation(
     attr: &AccessInformationValuesArray,
     store: &impl Verifier,
-) -> Result<(), Error> {
+) -> Result<(), KeyError> {
     store.verify_attribute(&attr.access_provider)?;
     store.verify_attribute(&attr.hris)?;
     store.verify_attribute(&attr.ldap)?;
@@ -53,7 +53,7 @@ fn verify_accessinformation(
 fn verify_identities(
     attr: &IdentitiesAttributesValuesArray,
     store: &impl Verifier,
-) -> Result<(), Error> {
+) -> Result<(), KeyError> {
     store.verify_attribute(&attr.github_id_v3)?;
     store.verify_attribute(&attr.github_id_v4)?;
     store.verify_attribute(&attr.github_primary_email)?;
@@ -76,7 +76,7 @@ fn verify_identities(
 fn verify_staff_information(
     attr: &StaffInformationValuesArray,
     store: &impl Verifier,
-) -> Result<(), Error> {
+) -> Result<(), KeyError> {
     store.verify_attribute(&attr.manager)?;
     store.verify_attribute(&attr.director)?;
     store.verify_attribute(&attr.staff)?;
@@ -89,7 +89,7 @@ fn verify_staff_information(
     Ok(())
 }
 
-pub fn sign_full_profile(profile: &mut Profile, store: &impl Signer) -> Result<(), Error> {
+pub fn sign_full_profile(profile: &mut Profile, store: &impl Signer) -> Result<(), KeyError> {
     store.sign_attribute(&mut profile.active)?;
     store.sign_attribute(&mut profile.alternative_name)?;
     store.sign_attribute(&mut profile.created)?;
@@ -124,7 +124,7 @@ pub fn sign_full_profile(profile: &mut Profile, store: &impl Signer) -> Result<(
 fn sign_accessinformation(
     attr: &mut AccessInformationValuesArray,
     store: &impl Signer,
-) -> Result<(), Error> {
+) -> Result<(), KeyError> {
     store.sign_attribute(&mut attr.access_provider)?;
     store.sign_attribute(&mut attr.hris)?;
     store.sign_attribute(&mut attr.ldap)?;
@@ -135,7 +135,7 @@ fn sign_accessinformation(
 fn sign_identities(
     attr: &mut IdentitiesAttributesValuesArray,
     store: &impl Signer,
-) -> Result<(), Error> {
+) -> Result<(), KeyError> {
     store.sign_attribute(&mut attr.github_id_v3)?;
     store.sign_attribute(&mut attr.github_id_v4)?;
     store.sign_attribute(&mut attr.github_primary_email)?;
@@ -158,7 +158,7 @@ fn sign_identities(
 fn sign_staff_information(
     attr: &mut StaffInformationValuesArray,
     store: &impl Signer,
-) -> Result<(), Error> {
+) -> Result<(), KeyError> {
     store.sign_attribute(&mut attr.manager)?;
     store.sign_attribute(&mut attr.director)?;
     store.sign_attribute(&mut attr.staff)?;
@@ -175,6 +175,7 @@ fn sign_staff_information(
 mod test {
     use super::*;
     use crate::crypto::SecretStore;
+    use anyhow::Error;
 
     fn get_fake_store() -> SecretStore {
         let key = include_str!("../data/fake_key.json");
@@ -204,6 +205,7 @@ mod test {
 mod test_make {
     use super::*;
     use crate::crypto::SecretStore;
+    use anyhow::Error;
 
     use std::env;
 

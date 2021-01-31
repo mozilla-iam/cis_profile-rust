@@ -1,3 +1,4 @@
+use crate::error::KeyError;
 use crate::error::SignerVerifierError;
 use crate::keys::*;
 use crate::schema::*;
@@ -6,7 +7,6 @@ use biscuit::jwa;
 use biscuit::jws;
 use biscuit::jws::Secret;
 use biscuit::Empty;
-use failure::Error;
 use serde_json::Value;
 use std::collections::HashMap;
 
@@ -25,13 +25,13 @@ use crate::error::WellKnownError;
 /// Trait implemented by types that can sign fields.
 pub trait Signer {
     /// Sign a field implementing the `WithPublihser` trait.
-    fn sign_attribute(&self, attr: &mut impl WithPublisher) -> Result<(), Error>;
+    fn sign_attribute(&self, attr: &mut impl WithPublisher) -> Result<(), KeyError>;
 }
 
 /// Trait implemented by types that can verify fields.
 pub trait Verifier {
     // Verify a field implementing the `WithPublisher` trait.
-    fn verify_attribute(&self, attr: &impl WithPublisher) -> Result<bool, Error>;
+    fn verify_attribute(&self, attr: &impl WithPublisher) -> Result<bool, KeyError>;
 }
 
 /// Stores secrets to sign and verify.
@@ -56,7 +56,7 @@ impl Signer for SecretStore {
     /// Signs an attribute field.
     /// Returns `Ok` if field is empty.
     /// Retruns `Err` if publisher has no signing key in the store.
-    fn sign_attribute(&self, attr: &mut impl WithPublisher) -> Result<(), Error> {
+    fn sign_attribute(&self, attr: &mut impl WithPublisher) -> Result<(), KeyError> {
         if attr.is_empty() {
             return Ok(());
         }
@@ -96,7 +96,7 @@ impl Verifier for SecretStore {
     /// Verifies an attribute field.
     /// Returns `Ok` if field is empty.
     /// Retruns `Err` if publisher has no signing key in the store.
-    fn verify_attribute(&self, attr: &impl WithPublisher) -> Result<bool, Error> {
+    fn verify_attribute(&self, attr: &impl WithPublisher) -> Result<bool, KeyError> {
         if attr.is_empty() {
             return Ok(true);
         }
@@ -121,11 +121,11 @@ impl Verifier for SecretStore {
 
 impl SecretStore {
     /// Loads singing keys from a `(Name, Key)` iterator.
-    pub fn with_sign_keys_from_inline_iter<I>(mut self, sign_keys: I) -> Result<Self, Error>
+    pub fn with_sign_keys_from_inline_iter<I>(mut self, sign_keys: I) -> Result<Self, KeyError>
     where
         I: IntoIterator<Item = (String, String)>,
     {
-        let sign_secrets: Result<HashMap<String, Secret>, Error> = sign_keys
+        let sign_secrets: Result<HashMap<String, Secret>, KeyError> = sign_keys
             .into_iter()
             .map(|(k, v)| sign_key_from_str(&v).map(|key| (k, key)))
             .collect();
@@ -134,11 +134,11 @@ impl SecretStore {
     }
 
     /// Loads verifying keys from a `(Name, Key)` iterator.
-    pub fn with_verify_keys_from_inline_iter<I>(mut self, sign_keys: I) -> Result<Self, Error>
+    pub fn with_verify_keys_from_inline_iter<I>(mut self, sign_keys: I) -> Result<Self, KeyError>
     where
         I: IntoIterator<Item = (String, String)>,
     {
-        let verify_secrets: Result<HashMap<String, Secret>, Error> = sign_keys
+        let verify_secrets: Result<HashMap<String, Secret>, KeyError> = sign_keys
             .into_iter()
             .map(|(k, v)| verify_key_from_str(&v).map(|key| (k, key)))
             .collect();
@@ -148,11 +148,11 @@ impl SecretStore {
 
     #[cfg(feature = "aws")]
     /// Loads singing keys from a `(Name, SSM_PATH)` iterator.
-    pub async fn with_sign_keys_from_ssm_iter<I>(mut self, keys: I) -> Result<Self, Error>
+    pub async fn with_sign_keys_from_ssm_iter<I>(mut self, keys: I) -> Result<Self, KeyError>
     where
         I: IntoIterator<Item = (String, String)>,
     {
-        let sign_secrets: Result<HashMap<String, Secret>, Error> =
+        let sign_secrets: Result<HashMap<String, Secret>, KeyError> =
             SecretStore::str_keys_from_ssm_iter(keys)
                 .await?
                 .into_iter()
@@ -164,11 +164,11 @@ impl SecretStore {
 
     #[cfg(feature = "aws")]
     /// Loads verifying keys from a `(Name, SSM_PATH)` iterator.
-    pub async fn with_verify_keys_from_ssm_iter<I>(mut self, keys: I) -> Result<Self, Error>
+    pub async fn with_verify_keys_from_ssm_iter<I>(mut self, keys: I) -> Result<Self, KeyError>
     where
         I: IntoIterator<Item = (String, String)>,
     {
-        let verify_secrets: Result<HashMap<String, Secret>, Error> =
+        let verify_secrets: Result<HashMap<String, Secret>, KeyError> =
             SecretStore::str_keys_from_ssm_iter(keys)
                 .await?
                 .into_iter()
@@ -179,7 +179,7 @@ impl SecretStore {
     }
 
     #[cfg(feature = "aws")]
-    async fn str_keys_from_ssm_iter<I>(keys: I) -> Result<Vec<(String, String)>, Error>
+    async fn str_keys_from_ssm_iter<I>(keys: I) -> Result<Vec<(String, String)>, KeyError>
     where
         I: IntoIterator<Item = (String, String)>,
     {
@@ -194,30 +194,33 @@ impl SecretStore {
                     ssm_client
                         .get_parameter(req)
                         .await
-                        .map_err(Into::into)
+                        .map_err(SsmError::GetParameterError)
                         .and_then(|res| {
                             if let Some(p) = res.parameter {
                                 if let Some(key) = p.value {
                                     Ok((publisher, key))
                                 } else {
-                                    Err(SsmError::NoValue.into())
+                                    Err(SsmError::NoValue)
                                 }
                             } else {
-                                Err(SsmError::NoParameter.into())
+                                Err(SsmError::NoParameter)
                             }
                         })
                 }),
         )
         .await
+        .map_err(Into::into)
     }
 
     #[cfg(feature = "well_known")]
     /// Loads verifying keys from a remote http jwks source.
-    pub async fn with_verify_keys_from_well_known(mut self, url: &str) -> Result<Self, Error> {
-        let res = reqwest::get(url).await?;
-        let mut json: Value = res.json().await?;
+    pub async fn with_verify_keys_from_well_known(mut self, url: &str) -> Result<Self, KeyError> {
+        let res = reqwest::get(url)
+            .await
+            .map_err(WellKnownError::ReqwestError)?;
+        let mut json: Value = res.json().await.map_err(WellKnownError::ReqwestError)?;
         if let Value::Object(keys) = json["api"]["publishers_jwks"].take() {
-            let verify_secrets: Result<HashMap<String, Secret>, Error> = keys
+            let verify_secrets: Result<HashMap<String, Secret>, KeyError> = keys
                 .into_iter()
                 .map(|(provider, mut v)| {
                     serde_json::from_value(v["keys"][0].take())
@@ -253,7 +256,7 @@ mod test {
     }
 
     #[test]
-    fn test_verify_attribute() -> Result<(), Error> {
+    fn test_verify_attribute() -> Result<(), KeyError> {
         let store = get_fake_store();
 
         let attr: StandardAttributeString =
@@ -264,7 +267,7 @@ mod test {
     }
 
     #[test]
-    fn test_verify_attribute_non_matching_claims() -> Result<(), Error> {
+    fn test_verify_attribute_non_matching_claims() -> Result<(), KeyError> {
         let store = get_fake_store();
 
         let mut attr: StandardAttributeString =
@@ -276,7 +279,7 @@ mod test {
     }
 
     #[test]
-    fn test_verify_attribute_invaild() -> Result<(), Error> {
+    fn test_verify_attribute_invaild() -> Result<(), KeyError> {
         let store = get_fake_store();
 
         let attr: StandardAttributeString =
@@ -287,7 +290,7 @@ mod test {
     }
 
     #[test]
-    fn test_sign_attribute() -> Result<(), Error> {
+    fn test_sign_attribute() -> Result<(), KeyError> {
         let store = get_fake_store();
 
         let mut attr: StandardAttributeString =
@@ -297,7 +300,7 @@ mod test {
     }
 
     #[test]
-    fn test_sign_and_verify_attribute() -> Result<(), Error> {
+    fn test_sign_and_verify_attribute() -> Result<(), KeyError> {
         let store = get_fake_store();
 
         let mut attr: StandardAttributeString =
@@ -309,7 +312,7 @@ mod test {
     }
 
     #[test]
-    fn test_sign_and_verify_struct() -> Result<(), Error> {
+    fn test_sign_and_verify_struct() -> Result<(), KeyError> {
         let store = get_fake_store();
 
         let mut attr = StandardAttributeString::default();
@@ -321,7 +324,7 @@ mod test {
     }
 
     #[test]
-    fn test_sign_and_verify_struct_null_value() -> Result<(), Error> {
+    fn test_sign_and_verify_struct_null_value() -> Result<(), KeyError> {
         let store = get_fake_store();
 
         let mut attr = StandardAttributeString::default();
@@ -334,7 +337,7 @@ mod test {
     }
 
     #[test]
-    fn test_sign_and_verify_struct_null_values() -> Result<(), Error> {
+    fn test_sign_and_verify_struct_null_values() -> Result<(), KeyError> {
         let store = get_fake_store();
 
         let mut attr = StandardAttributeValues::default();
@@ -347,7 +350,7 @@ mod test {
     }
 
     #[test]
-    fn test_sign_and_verify_profile_field() -> Result<(), Error> {
+    fn test_sign_and_verify_profile_field() -> Result<(), KeyError> {
         let store = get_fake_store();
 
         let mut profile = Profile::default();
@@ -398,7 +401,7 @@ mod test_secret_store {
     }
 
     #[test]
-    fn sign_wtih_pem_verify_with_jwk() -> Result<(), Error> {
+    fn sign_wtih_pem_verify_with_jwk() -> Result<(), KeyError> {
         let private = include_str!("../data/fake_key_private.pem");
         let public = include_str!("../data/fake_key.json");
         let store = SecretStore::default()
@@ -428,7 +431,7 @@ mod aws_test {
     use std::env;
 
     #[tokio::test]
-    async fn test_keys_from_ssm() -> Result<(), Error> {
+    async fn test_keys_from_ssm() -> Result<(), KeyError> {
         if let Ok(mozillians_key_ssm_name) = env::var("CIS_SSM_MOZILLIANSORG_KEY") {
             let store = SecretStore::default()
                 .with_sign_keys_from_ssm_iter(vec![(

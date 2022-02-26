@@ -1,6 +1,6 @@
 [package]
 name = "cis_profile"
-version = "0.6.0"
+version = "0.6.1"
 authors = ["Florian Merz <me@fiji-flo.de>"]
 edition = "2018"
 license = "MIT"
@@ -28,17 +28,17 @@ serde = "1.0.80"
 serde_derive = "1.0.80"
 serde_json = { version = "1.0.32", features = ["preserve_order"] }
 chrono = { version = "0.4", features = ["serde"] }
-chrono-tz = "0.5"
+chrono-tz = "0.6"
 thiserror = "1"
-lazy_static = "1.4"
+lazy_static = "1"
 futures = "0.3"
 
 juniper = { version = "0.15", optional = true }
-rusoto_core = { version = "0.46", optional = true }
-rusoto_ssm = { version = "0.46", optional = true }
+rusoto_core = { version = "0.47", optional = true }
+rusoto_ssm = { version = "0.47", optional = true }
 reqwest = { version = "0.11", optional = true, features = ["json"] }
 
 [dev-dependencies]
-valico = "3.1"
+valico = "3"
 tokio = { version = "1", features = ["full"] }
 anyhow = "1"

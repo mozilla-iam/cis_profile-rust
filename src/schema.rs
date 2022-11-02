@@ -60,7 +60,7 @@ pub trait WithPublisher {
 }
 
 /// We only suppet String → String dictionaries for now.
-#[derive(Default, Clone, PartialEq, Debug, Deserialize, Serialize)]
+#[derive(Default, Clone, PartialEq, Eq, Debug, Deserialize, Serialize)]
 pub struct KeyValue(pub BTreeMap<String, Option<String>>);
 
 #[cfg(feature = "graphql")]
@@ -84,7 +84,7 @@ graphql_scalar!(KeyValue as "KeyValue" where Scalar = <S> {
 });
 
 #[cfg_attr(feature = "graphql", derive(GraphQLEnum))]
-#[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Deserialize, Serialize)]
 pub enum Alg {
     #[serde(rename = "RS256")]
     Rs256,
@@ -98,7 +98,7 @@ pub enum Alg {
 
 /// Data classification for fields.
 #[cfg_attr(feature = "graphql", derive(GraphQLEnum))]
-#[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Deserialize, Serialize)]
 pub enum Classification {
     #[serde(rename = "MOZILLA CONFIDENTIAL")]
     MozillaConfidential,
@@ -122,7 +122,7 @@ impl Default for Classification {
 /// for displaying purposes. The values are ordered and implicitly include all stricter display
 /// levels (e.g. `ndaed` includes `staff` and `private`).
 #[cfg_attr(feature = "graphql", derive(GraphQLEnum))]
-#[derive(Clone, PartialEq, PartialOrd, Debug, Deserialize, Serialize)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Debug, Deserialize, Serialize)]
 pub enum Display {
     #[serde(rename = "public")]
     Public,
@@ -180,7 +180,7 @@ impl TryFrom<&str> for Display {
 }
 
 #[cfg_attr(feature = "graphql", derive(GraphQLObject))]
-#[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Deserialize, Serialize)]
 pub struct Metadata {
     pub classification: Classification,
     #[serde(serialize_with = "serialize_datetime")]
@@ -213,7 +213,7 @@ impl Metadata {
 
 /// Publisher authorities in the IAM project.
 #[cfg_attr(feature = "graphql", derive(GraphQLEnum))]
-#[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Deserialize, Serialize)]
 pub enum PublisherAuthority {
     #[serde(rename = "ldap")]
     Ldap,
@@ -255,7 +255,7 @@ impl TryFrom<&str> for PublisherAuthority {
 }
 
 #[cfg_attr(feature = "graphql", derive(GraphQLObject))]
-#[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Deserialize, Serialize)]
 pub struct AdditionalPublisher {
     pub alg: Alg,
     pub name: Option<String>,
@@ -264,7 +264,7 @@ pub struct AdditionalPublisher {
 }
 
 #[cfg_attr(feature = "graphql", derive(GraphQLObject))]
-#[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Deserialize, Serialize)]
 pub struct Publisher {
     pub alg: Alg,
     pub name: PublisherAuthority,
@@ -273,7 +273,7 @@ pub struct Publisher {
 }
 
 #[cfg_attr(feature = "graphql", derive(GraphQLObject))]
-#[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Deserialize, Serialize)]
 pub struct Signature {
     pub additional: Vec<AdditionalPublisher>,
     pub publisher: Publisher,
@@ -294,7 +294,7 @@ impl Default for Signature {
 }
 
 #[cfg_attr(feature = "graphql", derive(GraphQLObject))]
-#[derive(Clone, PartialEq, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Default, Deserialize, Serialize)]
 pub struct StandardAttributeBoolean {
     pub metadata: Metadata,
     pub signature: Signature,
@@ -332,7 +332,7 @@ impl WithPublisher for StandardAttributeBoolean {
 }
 
 #[cfg_attr(feature = "graphql", derive(GraphQLObject))]
-#[derive(Clone, PartialEq, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Default, Deserialize, Serialize)]
 pub struct StandardAttributeString {
     pub metadata: Metadata,
     pub signature: Signature,
@@ -371,7 +371,7 @@ impl WithPublisher for StandardAttributeString {
 }
 
 #[cfg_attr(feature = "graphql", derive(GraphQLObject))]
-#[derive(Clone, PartialEq, Debug, Default, Deserialize, Serialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Default, Deserialize, Serialize)]
 pub struct StandardAttributeValues {
     pub metadata: Metadata,
     pub signature: Signature,
@@ -409,7 +409,7 @@ impl WithPublisher for StandardAttributeValues {
 }
 
 #[cfg_attr(feature = "graphql", derive(GraphQLEnum))]
-#[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Deserialize, Serialize)]
 pub enum Typ {
     #[serde(rename = "JWS")]
     Jws,
@@ -418,7 +418,7 @@ pub enum Typ {
 }
 
 #[cfg_attr(feature = "graphql", derive(GraphQLObject))]
-#[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Deserialize, Serialize)]
 pub struct AccessInformationProviderSubObject {
     pub metadata: Metadata,
     pub signature: Signature,
@@ -462,7 +462,7 @@ impl WithPublisher for AccessInformationProviderSubObject {
 }
 
 #[cfg_attr(feature = "graphql", derive(GraphQLObject))]
-#[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Deserialize, Serialize)]
 pub struct AccessInformationValuesArray {
     #[serde(default)]
     pub access_provider: AccessInformationProviderSubObject,
@@ -489,7 +489,7 @@ impl Default for AccessInformationValuesArray {
 }
 
 #[cfg_attr(feature = "graphql", derive(GraphQLObject))]
-#[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Deserialize, Serialize)]
 pub struct IdentitiesAttributesValuesArray {
     #[serde(default)]
     pub github_id_v3: StandardAttributeString,
@@ -558,7 +558,7 @@ impl Default for IdentitiesAttributesValuesArray {
 }
 
 #[cfg_attr(feature = "graphql", derive(GraphQLObject))]
-#[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Deserialize, Serialize)]
 pub struct StaffInformationValuesArray {
     #[serde(default)]
     pub manager: StandardAttributeBoolean,
@@ -627,7 +627,7 @@ impl Default for StaffInformationValuesArray {
 }
 
 #[cfg_attr(feature = "graphql", derive(GraphQLObject))]
-#[derive(Clone, PartialEq, Debug, Deserialize, Serialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Deserialize, Serialize)]
 pub struct Profile {
     #[serde(default)]
     pub access_information: AccessInformationValuesArray,

@@ -1,6 +1,6 @@
 [package]
 name = "cis_profile"
-version = "0.4.4"
+version = "0.4.5"
 authors = ["Florian Merz <me@fiji-flo.de>"]
 edition = "2018"
 license = "MIT"
@@ -19,7 +19,7 @@ well_known = ["reqwest"]
 vendored = ["openssl/vendored"]
 
 [dependencies]
-dino_park_trust = { git = "https://github.com/mozilla-iam/dino-park-trust", tag = "0.0.7", version = "0.0.7" }
+dino_park_trust = { git = "https://github.com/mozilla-iam/dino-park-trust", tag = "0.0.8", version = "0.0.8" }
 biscuit = "0.4"
 ring = "0.16"
 openssl = "0.10"

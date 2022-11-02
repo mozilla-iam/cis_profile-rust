@@ -80,7 +80,7 @@ impl Signer for SecretStore {
             private: data,
         };
         let c = jws::Compact::new_decoded(header, claims);
-        let c = c.encode(&key)?;
+        let c = c.encode(key)?;
         let token = c.encoded()?.to_string();
         attr.set_publisher(Publisher {
             alg: Alg::Rs256,
@@ -108,7 +108,7 @@ impl Verifier for SecretStore {
         let token = attr.get_publisher().value.clone();
         let data = attr.data()?;
         let c: jws::Compact<biscuit::ClaimsSet<Value>, Empty> = jws::Compact::new_encoded(&token);
-        match c.decode(&key, jwa::SignatureAlgorithm::RS256) {
+        match c.decode(key, jwa::SignatureAlgorithm::RS256) {
             Ok(c) => {
                 let from_token = &c.payload()?.private;
                 Ok(from_token == &data)

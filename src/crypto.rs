@@ -312,8 +312,10 @@ mod test {
     fn test_sign_and_verify_struct() -> Result<(), Error> {
         let store = get_fake_store();
 
-        let mut attr = StandardAttributeString::default();
-        attr.value = Some(String::from("foobar"));
+        let mut attr = StandardAttributeString {
+            value: Some(String::from("foobar")),
+            ..StandardAttributeString::default()
+        };
         store.sign_attribute(&mut attr)?;
         let valid = store.verify_attribute(&attr)?;
         assert!(valid);
@@ -324,8 +326,10 @@ mod test {
     fn test_sign_and_verify_struct_null_value() -> Result<(), Error> {
         let store = get_fake_store();
 
-        let mut attr = StandardAttributeString::default();
-        attr.value = None;
+        let mut attr = StandardAttributeString {
+            value: None,
+            ..StandardAttributeString::default()
+        };
         store.sign_attribute(&mut attr)?;
         assert!(attr.signature.publisher.value.is_empty());
         let valid = store.verify_attribute(&attr)?;
@@ -337,8 +341,10 @@ mod test {
     fn test_sign_and_verify_struct_null_values() -> Result<(), Error> {
         let store = get_fake_store();
 
-        let mut attr = StandardAttributeValues::default();
-        attr.values = None;
+        let mut attr = StandardAttributeValues {
+            values: None,
+            ..StandardAttributeValues::default()
+        };
         store.sign_attribute(&mut attr)?;
         assert!(attr.signature.publisher.value.is_empty());
         let valid = store.verify_attribute(&attr)?;
